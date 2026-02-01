@@ -21,8 +21,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
+use crate::endpoints;
 use crate::error::{ApiErrorResponse, Error, Result};
-use crate::http::{BlockingHttpClient, Request};
+use crate::http::{BlockingHttpClient, Request, Response};
 use crate::models::{
     Bot, CompareHistoricalResponse, DataType, HistoricalDataResponse, RankedBot, RankingsQuery,
     RankingsResponse, RecentDataResponse, TimeFrame, UserBotsResponse,
@@ -134,6 +135,21 @@ impl ClientBuilder {
 }
 
 /// Blocking client for interacting with the `TopStats` API.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use topstats::blocking::Client;
+///
+/// fn main() -> Result<(), topstats::Error> {
+///     let client = Client::new("your-api-token")?;
+///     
+///     let bot = client.get_bot("432610292342587392")?;
+///     println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
+///     
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug)]
 #[allow(clippy::struct_field_names)]
 pub struct Client<H: BlockingHttpClient> {
@@ -175,17 +191,8 @@ impl<H: BlockingHttpClient> Client<H> {
         &self.config
     }
 
-    /// Validates a Discord bot ID format.
-    fn validate_bot_id(id: &str) -> Result<()> {
-        if Bot::validate_id(id) {
-            Ok(())
-        } else {
-            Err(Error::InvalidBotId(id.to_string()))
-        }
-    }
-
     /// Makes an authenticated request to the API.
-    fn request(&self, endpoint: &str, query: &[(&str, &str)]) -> Result<crate::http::Response> {
+    fn request(&self, endpoint: &str, query: &[(&str, &str)]) -> Result<Response> {
         let url = format!("{}{}", self.config.base_url, endpoint);
 
         let mut request = Request::get(&url)
@@ -223,17 +230,27 @@ impl<H: BlockingHttpClient> Client<H> {
 
     /// Gets information about a bot.
     ///
+    /// # Arguments
+    ///
+    /// * `bot_id` - The Discord bot ID (17-19 digit snowflake).
+    ///
     /// # Errors
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
     pub fn get_bot(&self, bot_id: &str) -> Result<Bot> {
-        Self::validate_bot_id(bot_id)?;
+        endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}");
         let response = self.request(&endpoint, &[])?;
         response.json()
     }
 
     /// Gets historical data for a bot.
+    ///
+    /// # Arguments
+    ///
+    /// * `bot_id` - The Discord bot ID.
+    /// * `time_frame` - The time period to query.
+    /// * `data_type` - The type of data to retrieve.
     ///
     /// # Errors
     ///
@@ -244,7 +261,7 @@ impl<H: BlockingHttpClient> Client<H> {
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<HistoricalDataResponse> {
-        Self::validate_bot_id(bot_id)?;
+        endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}/historical");
         let response = self.request(
             &endpoint,
@@ -258,11 +275,17 @@ impl<H: BlockingHttpClient> Client<H> {
 
     /// Gets recent statistics for a bot.
     ///
+    /// Returns hourly data for the past 30 hours and daily data for the past month.
+    ///
+    /// # Arguments
+    ///
+    /// * `bot_id` - The Discord bot ID.
+    ///
     /// # Errors
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
     pub fn get_bot_recent(&self, bot_id: &str) -> Result<RecentDataResponse> {
-        Self::validate_bot_id(bot_id)?;
+        endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}/recent");
         let response = self.request(&endpoint, &[])?;
         response.json()
@@ -272,27 +295,18 @@ impl<H: BlockingHttpClient> Client<H> {
 
     /// Gets the bot rankings.
     ///
+    /// # Arguments
+    ///
+    /// * `query` - Query parameters for filtering and sorting.
+    ///
     /// # Errors
     ///
     /// Returns an error if the query is invalid or the request fails.
     #[allow(clippy::needless_pass_by_value)]
     pub fn get_rankings(&self, query: RankingsQuery) -> Result<RankingsResponse> {
         query.validate()?;
-
-        let mut params: Vec<(&str, String)> = vec![
-            ("sortBy", query.sort_by.to_string()),
-            ("sortMethod", query.sort_order.to_string()),
-        ];
-
-        if let Some(limit) = query.limit {
-            params.push(("limit", limit.to_string()));
-        }
-        if let Some(offset) = query.offset {
-            params.push(("offset", offset.to_string()));
-        }
-
+        let params = endpoints::build_rankings_params(&query);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-
         let response = self.request("/discord/rankings/bots", &query_refs)?;
         response.json()
     }
@@ -300,6 +314,12 @@ impl<H: BlockingHttpClient> Client<H> {
     // ==================== Search Endpoints ====================
 
     /// Searches for bots by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - The search query.
+    /// * `limit` - Maximum number of results (default: 50, max: 100).
+    /// * `offset` - Offset for pagination.
     ///
     /// # Errors
     ///
@@ -310,56 +330,33 @@ impl<H: BlockingHttpClient> Client<H> {
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<Bot>> {
-        let mut params: Vec<(&str, String)> = vec![("query", query.to_string())];
-
-        if let Some(limit) = limit {
-            params.push(("limit", limit.to_string()));
-        }
-        if let Some(offset) = offset {
-            params.push(("offset", offset.to_string()));
-        }
-
+        let params = endpoints::build_search_params(query, limit, offset);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-
         let response = self.request("/search", &query_refs)?;
         response.json()
     }
 
     /// Searches for bots by tag.
     ///
+    /// # Arguments
+    ///
+    /// * `tag` - The tag to search for.
+    /// * `limit` - Maximum number of results (default: 50, max: 50).
+    /// * `offset` - Offset for pagination.
+    ///
     /// # Errors
     ///
     /// Returns an error if the request fails.
-    #[allow(clippy::items_after_statements)]
     pub fn search_by_tag(
         &self,
         tag: &str,
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<Bot>> {
-        let mut params: Vec<(&str, String)> = vec![("query", tag.to_string())];
-
-        if let Some(limit) = limit {
-            params.push(("limit", limit.to_string()));
-        }
-        if let Some(offset) = offset {
-            params.push(("offset", offset.to_string()));
-        }
-
+        let params = endpoints::build_search_params(tag, limit, offset);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-
-        #[derive(serde::Deserialize)]
-        struct TagResponse {
-            data: TagData,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct TagData {
-            results: Vec<Bot>,
-        }
-
         let response = self.request("/discord/tags", &query_refs)?;
-        let tag_response: TagResponse = response.json()?;
+        let tag_response: endpoints::TagResponse = response.json()?;
         Ok(tag_response.data.results)
     }
 
@@ -367,34 +364,33 @@ impl<H: BlockingHttpClient> Client<H> {
 
     /// Compares multiple bots.
     ///
+    /// # Arguments
+    ///
+    /// * `bot_ids` - Array of 2-4 bot IDs to compare.
+    ///
     /// # Errors
     ///
     /// Returns an error if the number of IDs is invalid or the request fails.
-    #[allow(clippy::items_after_statements)]
     pub fn compare_bots(&self, bot_ids: &[&str]) -> Result<Vec<RankedBot>> {
-        let count = bot_ids.len();
-        if !(2..=4).contains(&count) {
-            return Err(Error::InvalidCompareCount(count));
-        }
-
+        endpoints::validate_compare_count(bot_ids.len())?;
         for id in bot_ids {
-            Self::validate_bot_id(id)?;
+            endpoints::validate_bot_id(id)?;
         }
 
         let path = bot_ids.join("/");
         let endpoint = format!("/discord/compare/{path}");
-
-        #[derive(serde::Deserialize)]
-        struct CompareResponse {
-            data: Vec<RankedBot>,
-        }
-
         let response = self.request(&endpoint, &[])?;
-        let compare_response: CompareResponse = response.json()?;
+        let compare_response: endpoints::CompareResponse = response.json()?;
         Ok(compare_response.data)
     }
 
     /// Compares historical data for multiple bots.
+    ///
+    /// # Arguments
+    ///
+    /// * `bot_ids` - Array of 2-4 bot IDs to compare.
+    /// * `time_frame` - The time period to query.
+    /// * `data_type` - The type of data to retrieve.
     ///
     /// # Errors
     ///
@@ -405,18 +401,13 @@ impl<H: BlockingHttpClient> Client<H> {
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<CompareHistoricalResponse> {
-        let count = bot_ids.len();
-        if !(2..=4).contains(&count) {
-            return Err(Error::InvalidCompareCount(count));
-        }
-
+        endpoints::validate_compare_count(bot_ids.len())?;
         for id in bot_ids {
-            Self::validate_bot_id(id)?;
+            endpoints::validate_bot_id(id)?;
         }
 
         let path = bot_ids.join("/");
         let endpoint = format!("/discord/compare/historical/{path}");
-
         let response = self.request(
             &endpoint,
             &[
@@ -431,11 +422,20 @@ impl<H: BlockingHttpClient> Client<H> {
 
     /// Gets all bots owned by a user.
     ///
+    /// # Arguments
+    ///
+    /// * `user_id` - The Discord user ID.
+    ///
     /// # Errors
     ///
     /// Returns an error if the user ID is invalid or the request fails.
+    ///
+    /// # Note
+    ///
+    /// Data may be inaccurate as bots transferred to teams still appear
+    /// on the original owner's account.
     pub fn get_user_bots(&self, user_id: &str) -> Result<UserBotsResponse> {
-        Self::validate_bot_id(user_id)?;
+        endpoints::validate_bot_id(user_id)?; // User IDs are also snowflakes
         let endpoint = format!("/discord/users/{user_id}/bots");
         let response = self.request(&endpoint, &[])?;
         response.json()

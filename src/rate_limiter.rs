@@ -69,8 +69,10 @@ impl RateLimiter {
     }
 
     /// Returns the current number of available tokens.
+    ///
+    /// Useful for debugging and monitoring rate limiter state.
     #[must_use]
-    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    #[allow(dead_code, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn available_tokens(&mut self) -> u32 {
         self.refill();
         self.tokens as u32
@@ -149,6 +151,9 @@ impl RateLimiterManager {
     }
 
     /// Clears an active rate limit for an endpoint.
+    ///
+    /// Useful for manually resetting rate limit state after handling errors.
+    #[allow(dead_code)]
     pub async fn clear_rate_limit(&self, endpoint: &str) {
         let mut active = self.active_limits.lock().await;
         active.remove(endpoint);

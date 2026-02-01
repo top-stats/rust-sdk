@@ -52,10 +52,11 @@
 #![allow(clippy::module_name_repetitions)]
 
 mod client;
+#[doc(hidden)]
+pub mod endpoints;
 pub mod error;
-pub mod models;
-
 mod http;
+pub mod models;
 mod rate_limiter;
 
 #[cfg(feature = "blocking")]

@@ -3,14 +3,15 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use crate::endpoints;
 use crate::error::{ApiErrorResponse, Error, Result};
 use crate::http::{HttpClient, Request, Response};
 use crate::models::{
-    Bot, CompareHistoricalResponse, DataType, HistoricalDataResponse, RankedBot,
-    RankingsQuery, RankingsResponse, RecentDataResponse, TimeFrame, UserBotsResponse,
+    Bot, CompareHistoricalResponse, DataType, HistoricalDataResponse, RankedBot, RankingsQuery,
+    RankingsResponse, RecentDataResponse, TimeFrame, UserBotsResponse,
 };
 use crate::rate_limiter::{RateLimiterManager, MAX_DELAY_THRESHOLD};
-use crate::{DEFAULT_BASE_URL, user_agent};
+use crate::{user_agent, DEFAULT_BASE_URL};
 
 #[cfg(feature = "reqwest-client")]
 use crate::http::ReqwestClient;
@@ -118,6 +119,22 @@ impl ClientBuilder {
 }
 
 /// The main client for interacting with the `TopStats` API.
+///
+/// # Example
+///
+/// ```rust,no_run
+/// use topstats::Client;
+///
+/// #[tokio::main]
+/// async fn main() -> Result<(), topstats::Error> {
+///     let client = Client::new("your-api-token")?;
+///     
+///     let bot = client.get_bot("432610292342587392").await?;
+///     println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
+///     
+///     Ok(())
+/// }
+/// ```
 #[derive(Debug)]
 #[allow(clippy::struct_field_names)]
 pub struct Client<H: HttpClient> {
@@ -159,15 +176,6 @@ impl<H: HttpClient> Client<H> {
     #[must_use]
     pub const fn config(&self) -> &ClientConfig {
         &self.config
-    }
-
-    /// Validates a Discord bot ID format.
-    fn validate_bot_id(id: &str) -> Result<()> {
-        if Bot::validate_id(id) {
-            Ok(())
-        } else {
-            Err(Error::InvalidBotId(id.to_string()))
-        }
     }
 
     /// Makes an authenticated request to the API.
@@ -242,19 +250,8 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # async fn example() -> Result<(), topstats::Error> {
-    /// # let client = topstats::Client::new("token")?;
-    /// let bot = client.get_bot("432610292342587392").await?;
-    /// println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
-    /// # Ok(())
-    /// # }
-    /// ```
     pub async fn get_bot(&self, bot_id: &str) -> Result<Bot> {
-        Self::validate_bot_id(bot_id)?;
+        endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}");
         let response = self.request(&endpoint, &[]).await?;
         response.json()
@@ -277,7 +274,7 @@ impl<H: HttpClient> Client<H> {
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<HistoricalDataResponse> {
-        Self::validate_bot_id(bot_id)?;
+        endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}/historical");
         let response = self
             .request(
@@ -303,7 +300,7 @@ impl<H: HttpClient> Client<H> {
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
     pub async fn get_bot_recent(&self, bot_id: &str) -> Result<RecentDataResponse> {
-        Self::validate_bot_id(bot_id)?;
+        endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}/recent");
         let response = self.request(&endpoint, &[]).await?;
         response.json()
@@ -315,48 +312,16 @@ impl<H: HttpClient> Client<H> {
     ///
     /// # Arguments
     ///
-    /// * `query` - Optional query parameters for filtering and sorting.
+    /// * `query` - Query parameters for filtering and sorting.
     ///
     /// # Errors
     ///
     /// Returns an error if the query is invalid or the request fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # async fn example() -> Result<(), topstats::Error> {
-    /// # let client = topstats::Client::new("token")?;
-    /// use topstats::{RankingsQuery, SortBy};
-    ///
-    /// let rankings = client.get_rankings(
-    ///     RankingsQuery::new()
-    ///         .sort_by(SortBy::MonthlyVotes)
-    ///         .limit(100)
-    /// ).await?;
-    ///
-    /// for bot in &rankings.data {
-    ///     println!("#{}: {} ({} votes)", bot.monthly_votes_rank, bot.name, bot.monthly_votes);
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
+    #[allow(clippy::needless_pass_by_value)]
     pub async fn get_rankings(&self, query: RankingsQuery) -> Result<RankingsResponse> {
         query.validate()?;
-
-        let mut params: Vec<(&str, String)> = vec![
-            ("sortBy", query.sort_by.to_string()),
-            ("sortMethod", query.sort_order.to_string()),
-        ];
-
-        if let Some(limit) = query.limit {
-            params.push(("limit", limit.to_string()));
-        }
-        if let Some(offset) = query.offset {
-            params.push(("offset", offset.to_string()));
-        }
-
+        let params = endpoints::build_rankings_params(&query);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-
         let response = self.request("/discord/rankings/bots", &query_refs).await?;
         response.json()
     }
@@ -380,17 +345,8 @@ impl<H: HttpClient> Client<H> {
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<Bot>> {
-        let mut params: Vec<(&str, String)> = vec![("query", query.to_string())];
-
-        if let Some(limit) = limit {
-            params.push(("limit", limit.to_string()));
-        }
-        if let Some(offset) = offset {
-            params.push(("offset", offset.to_string()));
-        }
-
+        let params = endpoints::build_search_params(query, limit, offset);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-
         let response = self.request("/search", &query_refs).await?;
         response.json()
     }
@@ -406,36 +362,16 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the request fails.
-    #[allow(clippy::items_after_statements)]
     pub async fn search_by_tag(
         &self,
         tag: &str,
         limit: Option<u32>,
         offset: Option<u32>,
     ) -> Result<Vec<Bot>> {
-        let mut params: Vec<(&str, String)> = vec![("query", tag.to_string())];
-
-        if let Some(limit) = limit {
-            params.push(("limit", limit.to_string()));
-        }
-        if let Some(offset) = offset {
-            params.push(("offset", offset.to_string()));
-        }
-
+        let params = endpoints::build_search_params(tag, limit, offset);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
-
-        #[derive(serde::Deserialize)]
-        struct TagResponse {
-            data: TagData,
-        }
-
-        #[derive(serde::Deserialize)]
-        struct TagData {
-            results: Vec<Bot>,
-        }
-
         let response = self.request("/discord/tags", &query_refs).await?;
-        let tag_response: TagResponse = response.json()?;
+        let tag_response: endpoints::TagResponse = response.json()?;
         Ok(tag_response.data.results)
     }
 
@@ -450,44 +386,16 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the number of IDs is invalid or the request fails.
-    ///
-    /// # Example
-    ///
-    /// ```rust,no_run
-    /// # async fn example() -> Result<(), topstats::Error> {
-    /// # let client = topstats::Client::new("token")?;
-    /// let bots = client.compare_bots(&[
-    ///     "432610292342587392",
-    ///     "646937666251915264"
-    /// ]).await?;
-    ///
-    /// for bot in &bots {
-    ///     println!("{}: {} monthly votes", bot.name, bot.monthly_votes);
-    /// }
-    /// # Ok(())
-    /// # }
-    /// ```
-    #[allow(clippy::items_after_statements)]
     pub async fn compare_bots(&self, bot_ids: &[&str]) -> Result<Vec<RankedBot>> {
-        let count = bot_ids.len();
-        if !(2..=4).contains(&count) {
-            return Err(Error::InvalidCompareCount(count));
-        }
-
+        endpoints::validate_compare_count(bot_ids.len())?;
         for id in bot_ids {
-            Self::validate_bot_id(id)?;
+            endpoints::validate_bot_id(id)?;
         }
 
         let path = bot_ids.join("/");
         let endpoint = format!("/discord/compare/{path}");
-
-        #[derive(serde::Deserialize)]
-        struct CompareResponse {
-            data: Vec<RankedBot>,
-        }
-
         let response = self.request(&endpoint, &[]).await?;
-        let compare_response: CompareResponse = response.json()?;
+        let compare_response: endpoints::CompareResponse = response.json()?;
         Ok(compare_response.data)
     }
 
@@ -508,18 +416,13 @@ impl<H: HttpClient> Client<H> {
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<CompareHistoricalResponse> {
-        let count = bot_ids.len();
-        if !(2..=4).contains(&count) {
-            return Err(Error::InvalidCompareCount(count));
-        }
-
+        endpoints::validate_compare_count(bot_ids.len())?;
         for id in bot_ids {
-            Self::validate_bot_id(id)?;
+            endpoints::validate_bot_id(id)?;
         }
 
         let path = bot_ids.join("/");
         let endpoint = format!("/discord/compare/historical/{path}");
-
         let response = self
             .request(
                 &endpoint,
@@ -549,7 +452,7 @@ impl<H: HttpClient> Client<H> {
     /// Data may be inaccurate as bots transferred to teams still appear
     /// on the original owner's account.
     pub async fn get_user_bots(&self, user_id: &str) -> Result<UserBotsResponse> {
-        Self::validate_bot_id(user_id)?; // User IDs are also snowflakes
+        endpoints::validate_bot_id(user_id)?; // User IDs are also snowflakes
         let endpoint = format!("/discord/users/{user_id}/bots");
         let response = self.request(&endpoint, &[]).await?;
         response.json()
@@ -576,9 +479,9 @@ mod tests {
 
     #[test]
     fn test_validate_bot_id() {
-        assert!(Client::<ReqwestClient>::validate_bot_id("432610292342587392").is_ok());
-        assert!(Client::<ReqwestClient>::validate_bot_id("123").is_err());
-        assert!(Client::<ReqwestClient>::validate_bot_id("abc").is_err());
+        assert!(endpoints::validate_bot_id("432610292342587392").is_ok());
+        assert!(endpoints::validate_bot_id("123").is_err());
+        assert!(endpoints::validate_bot_id("abc").is_err());
     }
 
     #[test]

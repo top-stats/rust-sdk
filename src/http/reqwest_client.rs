@@ -104,7 +104,11 @@ mod blocking_impl {
     use crate::user_agent;
 
     /// Blocking HTTP client implementation using reqwest.
+    ///
+    /// Note: This is provided as an alternative to `UreqClient` for environments
+    /// where reqwest's blocking feature is preferred over ureq.
     #[derive(Debug, Clone)]
+    #[allow(dead_code)]
     pub struct BlockingReqwestClient {
         client: reqwest::blocking::Client,
     }
@@ -182,8 +186,9 @@ mod blocking_impl {
     }
 }
 
-#[cfg(all(feature = "blocking", feature = "reqwest-client"))]
-pub use blocking_impl::BlockingReqwestClient;
+// BlockingReqwestClient is available but not re-exported by default.
+// Users can access it via `topstats::http::reqwest_client::blocking_impl::BlockingReqwestClient`
+// if needed, but `UreqClient` is the recommended blocking client.
 
 #[cfg(test)]
 mod tests {
