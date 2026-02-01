@@ -141,30 +141,32 @@ jobs:
       - uses: actions/checkout@v4
       - uses: crate-ci/typos@master
 
-  semver:
-    name: Semver (${{ matrix.mode }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [async, blocking]
-        include:
-          - mode: async
-            features: async,reqwest-client,rustls-tls
-          - mode: blocking
-            features: blocking,ureq-client
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: semver-${{ matrix.mode }}
-      - uses: obi1kenobi/cargo-semver-checks-action@v2
-        with:
-          feature-group: only-explicit-features
-          features: ${{ matrix.features }}
+  # TODO: Re-enable after v0.1.0 is published to crates.io
+  # Currently disabled because the baseline (v0.0.0) is a placeholder crate with no lib target
+  # semver:
+  #   name: Semver (${{ matrix.mode }})
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       mode: [async, blocking]
+  #       include:
+  #         - mode: async
+  #           features: async,reqwest-client,rustls-tls
+  #         - mode: blocking
+  #           features: blocking,ureq-client
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #       with:
+  #         fetch-depth: 0
+  #     - uses: dtolnay/rust-toolchain@stable
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         key: semver-${{ matrix.mode }}
+  #     - uses: obi1kenobi/cargo-semver-checks-action@v2
+  #       with:
+  #         feature-group: only-explicit-features
+  #         features: ${{ matrix.features }}
 
   markdownlint:
     name: Markdown
