@@ -1815,7 +1815,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "topstats-sdk"
+name = "topstats"
 version = "0.1.0"
 dependencies = [
  "async-trait",
