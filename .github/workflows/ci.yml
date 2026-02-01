@@ -1,0 +1,133 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  MSRV: "1.70"
+
+jobs:
+  fmt:
+    name: Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: Clippy (${{ matrix.mode }}, ${{ matrix.rust }})
+    needs: fmt
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, nightly]
+        mode: [async, blocking]
+        include:
+          - mode: async
+            features: ""
+          - mode: blocking
+            features: --no-default-features --features "blocking,ureq-client"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.mode }}-${{ matrix.rust }}
+      - run: cargo clippy ${{ matrix.features }} --all-targets -- -D warnings
+
+  test:
+    name: Test (${{ matrix.mode }}, ${{ matrix.rust }})
+    needs: fmt
+    runs-on: ubuntu-latest
+    continue-on-error: ${{ matrix.rust == 'nightly' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: [stable, nightly]
+        mode: [async, blocking]
+        include:
+          - mode: async
+            features: ""
+          - mode: blocking
+            features: --no-default-features --features "blocking,ureq-client"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.mode }}-${{ matrix.rust }}
+      - uses: taiki-e/install-action@nextest
+      - run: cargo nextest run ${{ matrix.features }} --lib
+
+  msrv:
+    name: MSRV (${{ matrix.mode }})
+    needs: fmt
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [async, blocking]
+        include:
+          - mode: async
+            features: ""
+          - mode: blocking
+            features: --no-default-features --features "blocking,ureq-client"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: msrv-${{ matrix.mode }}
+      - run: cargo check ${{ matrix.features }}
+
+  docs:
+    name: Docs (${{ matrix.mode }})
+    needs: fmt
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [async, blocking]
+        include:
+          - mode: async
+            features: ""
+          - mode: blocking
+            features: --no-default-features --features "blocking,ureq-client"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: docs-${{ matrix.mode }}
+      - run: cargo doc --no-deps ${{ matrix.features }}
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  markdownlint:
+    name: Markdown
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: "**/*.md"

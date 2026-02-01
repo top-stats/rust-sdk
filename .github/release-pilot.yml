@@ -1,0 +1,6 @@
+packages:
+  - name: topstats
+    ecosystem: cargo
+
+changelog:
+  enabled: true
