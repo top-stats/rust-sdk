@@ -58,6 +58,10 @@ pub mod models;
 mod http;
 mod rate_limiter;
 
+#[cfg(feature = "blocking")]
+#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
+pub mod blocking;
+
 // Re-exports
 pub use client::{Client, ClientBuilder, ClientConfig};
 pub use error::{Error, Result};
