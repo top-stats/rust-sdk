@@ -103,8 +103,17 @@ check-async:
 check-blocking:
     cargo check --no-default-features --features "blocking,ureq-client"
 
-# Full CI check (what CI would run)
-ci: fmt-check lint-all test-all machete deny typos
+# Check docs build without warnings
+doc-check:
+    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+    RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --no-default-features --features "blocking,ureq-client"
+
+# Lint markdown files
+markdownlint:
+    markdownlint-cli2 "**/*.md" "#target"
+
+# Full CI check (mirrors GitHub Actions)
+ci: fmt-check lint-all test-all doc-check machete audit deny typos markdownlint
     @echo "All CI checks passed!"
 
 # Run CI workflow locally with act
