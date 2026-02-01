@@ -7,6 +7,7 @@ use std::fmt;
 /// Time frame for historical data queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum TimeFrame {
     /// All available historical data.
     #[default]
@@ -81,6 +82,7 @@ impl fmt::Display for TimeFrame {
 /// Type of historical data to query.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum DataType {
     /// Monthly vote count.
     #[default]

@@ -5,6 +5,7 @@ use std::fmt;
 
 /// Sort criteria for rankings queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
 pub enum SortBy {
     /// Sort by monthly votes rank.
     #[default]
@@ -35,6 +36,7 @@ impl fmt::Display for SortBy {
 
 /// Sort order for rankings queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
 pub enum SortOrder {
     /// Ascending order (lowest rank first = best).
     #[default]

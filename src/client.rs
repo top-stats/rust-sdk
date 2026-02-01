@@ -53,6 +53,9 @@ use crate::{user_agent, DEFAULT_BASE_URL};
 /// Default maximum delay threshold before returning an error (in seconds).
 pub const MAX_DELAY_THRESHOLD: f64 = 10.0;
 
+/// Default maximum number of retry attempts for rate-limited requests.
+pub const DEFAULT_MAX_RETRIES: u32 = 3;
+
 // Type alias for the default HTTP client based on features
 #[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
 type DefaultHttpClient = crate::http::ReqwestClient;
@@ -83,6 +86,8 @@ pub struct ClientConfig {
     pub auto_retry: bool,
     /// Maximum delay threshold before throwing an error (in seconds).
     pub max_delay_threshold: f64,
+    /// Maximum number of retry attempts for rate-limited requests.
+    pub max_retries: u32,
 }
 
 impl Default for ClientConfig {
@@ -92,6 +97,7 @@ impl Default for ClientConfig {
             base_url: DEFAULT_BASE_URL.to_string(),
             auto_retry: true,
             max_delay_threshold: MAX_DELAY_THRESHOLD,
+            max_retries: DEFAULT_MAX_RETRIES,
         }
     }
 }
@@ -134,6 +140,15 @@ impl ClientBuilder {
     #[must_use]
     pub const fn max_delay_threshold(mut self, seconds: f64) -> Self {
         self.config.max_delay_threshold = seconds;
+        self
+    }
+
+    /// Sets the maximum number of retry attempts for rate-limited requests.
+    ///
+    /// Default is 3. Set to 0 to disable retries entirely (equivalent to `auto_retry(false)`).
+    #[must_use]
+    pub const fn max_retries(mut self, retries: u32) -> Self {
+        self.config.max_retries = retries;
         self
     }
 
@@ -213,6 +228,12 @@ impl Client<DefaultHttpClient> {
 /// Trait abstracting over async and sync HTTP clients.
 ///
 /// This allows the endpoint implementations to be generic over the HTTP client type.
+///
+/// # Thread Safety
+///
+/// Implementations must be `Send + Sync` to allow the client to be shared across
+/// threads. This is required because [`Client`] wraps the HTTP client in an `Arc`
+/// and may be cloned and used from multiple threads or async tasks concurrently.
 #[maybe_async::maybe_async]
 pub trait MaybeHttpClient: Send + Sync {
     /// Sends an HTTP request and returns the response.
@@ -248,6 +269,19 @@ where
     #[maybe_async::maybe_async]
     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     async fn request(&self, endpoint: &str, query: &[(&str, &str)]) -> Result<Response> {
+        self.request_with_retries(endpoint, query, self.config.max_retries)
+            .await
+    }
+
+    /// Makes an authenticated request with retry tracking.
+    #[maybe_async::maybe_async]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    async fn request_with_retries(
+        &self,
+        endpoint: &str,
+        query: &[(&str, &str)],
+        retries_remaining: u32,
+    ) -> Result<Response> {
         let url = format!("{}{}", self.config.base_url, endpoint);
 
         let mut request = Request::get(&url)
@@ -271,17 +305,30 @@ where
             // Auto-retry for short rate limit delays
             if response.is_rate_limited() {
                 if let Some(expires_in) = error_response.expires_in {
-                    if self.config.auto_retry && expires_in <= self.config.max_delay_threshold {
+                    let can_retry = self.config.auto_retry
+                        && retries_remaining > 0
+                        && expires_in <= self.config.max_delay_threshold;
+
+                    if can_retry {
                         #[cfg(feature = "tracing")]
-                        tracing::debug!("Rate limited, auto-retrying after {}s", expires_in);
+                        tracing::debug!(
+                            "Rate limited, auto-retrying after {}s ({} retries remaining)",
+                            expires_in,
+                            retries_remaining - 1
+                        );
 
                         // Sleep and retry
                         sleep_ms((expires_in * 1000.0) as u64).await;
 
                         #[cfg(not(feature = "blocking"))]
-                        return Box::pin(self.request(endpoint, query)).await;
+                        return Box::pin(self.request_with_retries(
+                            endpoint,
+                            query,
+                            retries_remaining - 1,
+                        ))
+                        .await;
                         #[cfg(feature = "blocking")]
-                        return self.request(endpoint, query);
+                        return self.request_with_retries(endpoint, query, retries_remaining - 1);
                     }
                 }
             }
@@ -552,5 +599,12 @@ mod tests {
         assert_eq!(config.base_url, DEFAULT_BASE_URL);
         assert!(config.auto_retry);
         assert!((config.max_delay_threshold - MAX_DELAY_THRESHOLD).abs() < f64::EPSILON);
+        assert_eq!(config.max_retries, DEFAULT_MAX_RETRIES);
+    }
+
+    #[test]
+    fn test_client_builder_max_retries() {
+        let builder = ClientBuilder::new().token("test").max_retries(5);
+        assert_eq!(builder.config.max_retries, 5);
     }
 }

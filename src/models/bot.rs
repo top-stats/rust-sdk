@@ -81,12 +81,18 @@ pub struct Bot {
     #[serde(rename = "percentage_changes")]
     pub percentage_changes: Option<PercentageChanges>,
 
-    /// Library used (deprecated).
-    #[deprecated(note = "This field is deprecated and will be removed")]
+    /// Library used (deprecated by Top.gg).
+    #[deprecated(
+        since = "0.1.0",
+        note = "This field is deprecated by Top.gg and will be removed in a future version"
+    )]
     pub lib: Option<String>,
 
-    /// Whether the bot is certified (deprecated).
-    #[deprecated(note = "This field is deprecated and will be removed")]
+    /// Whether the bot is certified (deprecated by Top.gg).
+    #[deprecated(
+        since = "0.1.0",
+        note = "This field is deprecated by Top.gg and will be removed in a future version"
+    )]
     pub certified: Option<bool>,
 }
 

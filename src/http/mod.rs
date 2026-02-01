@@ -15,10 +15,10 @@ mod reqwest_client;
 #[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
 pub use reqwest_client::ReqwestClient;
 
-#[cfg(feature = "ureq-client")]
+#[cfg(all(feature = "ureq-client", feature = "blocking"))]
 mod ureq_client;
 
-#[cfg(feature = "ureq-client")]
+#[cfg(all(feature = "ureq-client", feature = "blocking"))]
 pub use ureq_client::UreqClient;
 
 /// HTTP request method.

@@ -7,6 +7,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// The main error type for the `TopStats` SDK.
 #[derive(Error, Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The API returned a rate limit response.
     /// Contains the number of seconds until the rate limit expires.
