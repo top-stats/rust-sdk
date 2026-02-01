@@ -71,6 +71,20 @@
 #![allow(clippy::similar_names)]
 #![allow(clippy::module_name_repetitions)]
 
+// Compile-time check: async and blocking are mutually exclusive
+#[cfg(all(feature = "async", feature = "blocking"))]
+compile_error!(
+    "Features `async` and `blocking` are mutually exclusive. \
+     Use `default-features = false` and enable only one."
+);
+
+// Compile-time check: at least one mode must be enabled
+#[cfg(not(any(feature = "async", feature = "blocking")))]
+compile_error!(
+    "Either `async` or `blocking` feature must be enabled. \
+     The `async` feature is enabled by default."
+);
+
 mod client;
 #[doc(hidden)]
 pub mod endpoints;

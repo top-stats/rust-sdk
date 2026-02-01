@@ -3,15 +3,16 @@
 //! This module provides a trait-based abstraction over HTTP clients,
 //! allowing users to choose between different backends (reqwest, ureq).
 
+#[cfg(not(feature = "blocking"))]
 use async_trait::async_trait;
 use std::collections::HashMap;
 
 use crate::error::Result;
 
-#[cfg(feature = "reqwest-client")]
+#[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
 mod reqwest_client;
 
-#[cfg(feature = "reqwest-client")]
+#[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
 pub use reqwest_client::ReqwestClient;
 
 #[cfg(feature = "ureq-client")]
@@ -132,8 +133,8 @@ impl Response {
 }
 
 /// Trait for async HTTP clients.
+#[cfg(not(feature = "blocking"))]
 #[async_trait]
-#[allow(dead_code)] // Not used in blocking mode
 pub trait HttpClient: Send + Sync {
     /// Sends an HTTP request and returns the response.
     ///
