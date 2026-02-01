@@ -221,7 +221,7 @@ mod tests {
         assert_eq!(bot.id, "432610292342587392");
         assert_eq!(bot.name, "Mudae");
         assert_eq!(bot.monthly_votes_rank, 1);
-        assert_eq!(bot.server_count, Some(3371839));
+        assert_eq!(bot.server_count, Some(3_371_839));
         assert_eq!(bot.monthly_votes_rank_change, Some(1));
     }
 

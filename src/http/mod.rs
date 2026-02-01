@@ -207,17 +207,17 @@ mod tests {
 
     #[test]
     fn test_response_json_parsing() {
-        let response = Response {
-            status: 200,
-            headers: HashMap::new(),
-            body: r#"{"name": "test", "value": 42}"#.to_string(),
-        };
-
         #[derive(serde::Deserialize, Debug, PartialEq)]
         struct TestData {
             name: String,
             value: i32,
         }
+
+        let response = Response {
+            status: 200,
+            headers: HashMap::new(),
+            body: r#"{"name": "test", "value": 42}"#.to_string(),
+        };
 
         let data: TestData = response.json().unwrap();
         assert_eq!(data.name, "test");

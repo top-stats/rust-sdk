@@ -12,7 +12,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  MSRV: "1.70"
+  MSRV: "1.85"
   BLOCKING_FEATURES: --no-default-features --features "blocking,ureq-client"
 
 jobs:

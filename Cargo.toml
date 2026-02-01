@@ -2,7 +2,7 @@
 name = "topstats"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.85"
 license = "MIT"
 description = "Rust SDK for the TopStats.gg API - Discord bot statistics tracking"
 homepage = "https://topstats.gg"

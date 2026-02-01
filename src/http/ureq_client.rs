@@ -139,7 +139,9 @@ mod tests {
     #[test]
     fn test_ureq_client_clone() {
         let client = UreqClient::new().unwrap();
+        // Verify Clone is implemented - use both to avoid redundant_clone warning
         let cloned = client.clone();
-        let _ = cloned;
+        drop(client);
+        drop(cloned);
     }
 }

@@ -20,11 +20,11 @@ test-all: test test-blocking
 
 # Run clippy for async mode
 lint:
-    cargo clippy -- -D warnings
+    cargo clippy --all-targets -- -D warnings
 
 # Run clippy for blocking mode
 lint-blocking:
-    cargo clippy --no-default-features --features "blocking,ureq-client" -- -D warnings
+    cargo clippy --no-default-features --features "blocking,ureq-client" --all-targets -- -D warnings
 
 # Run clippy for both modes
 lint-all: lint lint-blocking
