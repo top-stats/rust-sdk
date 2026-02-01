@@ -12,14 +12,15 @@ keywords = ["discord", "bot", "statistics", "topgg", "api"]
 categories = ["api-bindings", "asynchronous"]
 
 [features]
-default = ["reqwest-client", "rustls-tls"]
+default = ["async", "reqwest-client", "rustls-tls"]
+
+# Async (default) or blocking mode - mutually exclusive
+async = ["dep:futures-timer"]
+blocking = ["maybe-async/is_sync"]
 
 # HTTP client backends
 reqwest-client = ["dep:reqwest"]
-ureq-client = ["dep:ureq", "blocking"]
-
-# Blocking API support
-blocking = ["reqwest?/blocking"]
+ureq-client = ["dep:ureq"]
 
 # TLS backends (for reqwest)
 rustls-tls = ["reqwest?/rustls"]
@@ -36,10 +37,12 @@ serde_json = "1.0"
 # Error handling
 thiserror = "2.0"
 
-# Async
+# Async/sync unification
+maybe-async = "0.2"
 async-trait = "0.1"
-futures = "0.3"
-futures-timer = "3.0"
+
+# Async runtime support (only needed for async mode)
+futures-timer = { version = "3.0", optional = true }
 
 # HTTP clients (feature-gated)
 reqwest = { version = "0.13", default-features = false, features = ["json", "query"], optional = true }
@@ -51,6 +54,10 @@ tracing = { version = "0.1", optional = true }
 
 # Time handling
 chrono = { version = "0.4", features = ["serde"] }
+
+# Sync blocking support
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.0", features = ["rt"], optional = true }
 
 [dev-dependencies]
 tokio = { version = "1.0", features = ["full", "test-util"] }

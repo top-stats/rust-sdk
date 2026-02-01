@@ -5,14 +5,13 @@
 //!
 //! ## Features
 //!
-//! - **Async-first** design with runtime-agnostic implementation
-//! - **Multiple HTTP backends**: reqwest (default) or ureq
-//! - **Blocking API** available via the `blocking` feature
+//! - **Async-first** design with optional blocking mode
+//! - **Multiple HTTP backends**: reqwest (async) or ureq (blocking)
 //! - **Built-in rate limiting** with automatic retry for short delays
 //! - **Type-safe** models with serde serialization
 //! - **Tracing** support for logging (optional)
 //!
-//! ## Quick Start
+//! ## Quick Start (Async)
 //!
 //! ```rust,no_run
 //! use topstats::Client;
@@ -29,11 +28,32 @@
 //! }
 //! ```
 //!
+//! ## Blocking Mode
+//!
+//! For synchronous code, disable default features and enable `blocking`:
+//!
+//! ```toml
+//! [dependencies]
+//! topstats = { version = "0.1", default-features = false, features = ["blocking", "ureq-client"] }
+//! ```
+//!
+//! ```rust,ignore
+//! use topstats::Client;
+//!
+//! fn main() -> Result<(), topstats::Error> {
+//!     let client = Client::new("your-api-token")?;
+//!     let bot = client.get_bot("432610292342587392")?;
+//!     println!("Bot: {}", bot.name);
+//!     Ok(())
+//! }
+//! ```
+//!
 //! ## Feature Flags
 //!
-//! - `reqwest-client` (default): Use reqwest as the HTTP backend
-//! - `ureq-client`: Use ureq as the HTTP backend (enables `blocking`)
-//! - `blocking`: Enable the blocking API
+//! - `async` (default): Enable async mode
+//! - `blocking`: Enable blocking/sync mode (mutually exclusive with `async`)
+//! - `reqwest-client` (default): Use reqwest as the HTTP backend (async)
+//! - `ureq-client`: Use ureq as the HTTP backend (blocking)
 //! - `rustls-tls` (default): Use rustls for TLS
 //! - `native-tls`: Use native TLS implementation
 //! - `tracing`: Enable tracing/logging support
@@ -55,13 +75,8 @@ mod client;
 #[doc(hidden)]
 pub mod endpoints;
 pub mod error;
-mod http;
+pub(crate) mod http;
 pub mod models;
-mod rate_limiter;
-
-#[cfg(feature = "blocking")]
-#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
-pub mod blocking;
 
 // Re-exports
 pub use client::{Client, ClientBuilder, ClientConfig};
@@ -77,7 +92,5 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The User-Agent string sent with requests.
 #[must_use]
 pub fn user_agent() -> String {
-    format!(
-        "topstats-rs/{VERSION} (https://github.com/top-stats/rust-sdk)"
-    )
+    format!("topstats-rs/{VERSION} (https://github.com/top-stats/rust-sdk)")
 }

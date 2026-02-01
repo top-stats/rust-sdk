@@ -8,27 +8,26 @@ A Rust SDK for the [TopStats.gg API](https://topstats.gg), providing statistics 
 
 ## Features
 
-- **Async-first** design with runtime-agnostic implementation
-- **Multiple HTTP backends**: reqwest (default) or ureq
-- **Blocking API** available via the `blocking` feature
+- **Async or blocking** - Choose at compile time via feature flags
+- **Multiple HTTP backends**: reqwest (async) or ureq (blocking)
 - **Built-in rate limiting** with automatic retry for short delays
 - **Type-safe** models with serde serialization
 - **Tracing** support for logging (optional)
 
 ## Installation
 
-Add this to your `Cargo.toml`:
+### Async (default)
 
 ```toml
 [dependencies]
 topstats = "0.1"
 ```
 
-Or with specific features:
+### Blocking
 
 ```toml
 [dependencies]
-topstats = { version = "0.1", features = ["blocking", "ureq-client"] }
+topstats = { version = "0.1", default-features = false, features = ["blocking", "ureq-client"] }
 ```
 
 ## Quick Start
@@ -61,15 +60,8 @@ async fn main() -> Result<(), topstats::Error> {
 
 ### Blocking Usage
 
-Enable the `blocking` and `ureq-client` features:
-
-```toml
-[dependencies]
-topstats = { version = "0.1", features = ["blocking", "ureq-client"] }
-```
-
 ```rust
-use topstats::blocking::Client;
+use topstats::Client;
 
 fn main() -> Result<(), topstats::Error> {
     let client = Client::new("your-api-token")?;
@@ -165,12 +157,15 @@ let query = RankingsQuery::new()
 
 | Feature | Default | Description |
 |---------|---------|-------------|
-| `reqwest-client` | Yes | Use reqwest as HTTP backend |
-| `ureq-client` | No | Use ureq as HTTP backend (enables blocking) |
-| `blocking` | No | Enable blocking API |
+| `async` | Yes | Enable async mode (requires `reqwest-client`) |
+| `blocking` | No | Enable blocking mode (requires `ureq-client`) |
+| `reqwest-client` | Yes | Use reqwest as HTTP backend (async) |
+| `ureq-client` | No | Use ureq as HTTP backend (blocking) |
 | `rustls-tls` | Yes | Use rustls for TLS |
 | `native-tls` | No | Use native TLS implementation |
 | `tracing` | No | Enable tracing/logging support |
+
+**Note:** `async` and `blocking` are mutually exclusive. The crate compiles as either async or blocking, not both.
 
 ## Error Handling
 
@@ -179,7 +174,7 @@ use topstats::{Client, Error};
 
 let client = Client::new("your-token")?;
 
-match client.get_bot("invalid-id").await {
+match client.get_bot("invalid-id").await {  // Remove .await for blocking mode
     Ok(bot) => println!("Found: {}", bot.name),
     Err(Error::InvalidBotId(id)) => println!("Invalid bot ID: {}", id),
     Err(Error::NotFound { message }) => println!("Bot not found: {}", message),
@@ -193,8 +188,7 @@ match client.get_bot("invalid-id").await {
 ## Rate Limiting
 
 The SDK includes built-in rate limiting that:
-- Tracks global (120/min) and per-endpoint (60/min) limits
-- Automatically waits for short delays (< 5 seconds by default)
+- Automatically waits for short delays (< 10 seconds by default)
 - Throws `Error::RateLimited` for longer delays
 
 You can configure this behavior:

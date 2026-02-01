@@ -133,6 +133,7 @@ impl Response {
 
 /// Trait for async HTTP clients.
 #[async_trait]
+#[allow(dead_code)] // Not used in blocking mode
 pub trait HttpClient: Send + Sync {
     /// Sends an HTTP request and returns the response.
     ///

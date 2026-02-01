@@ -1,20 +1,71 @@
 //! Main client implementation for the `TopStats` API.
+//!
+//! This module provides the [`Client`] for interacting with the `TopStats` API.
+//! The client can operate in either async or blocking mode depending on the
+//! `blocking` feature flag.
+//!
+//! # Async Mode (default)
+//!
+//! ```rust,no_run
+//! use topstats::Client;
+//!
+//! #[tokio::main]
+//! async fn main() -> Result<(), topstats::Error> {
+//!     let client = Client::new("your-api-token")?;
+//!     let bot = client.get_bot("432610292342587392").await?;
+//!     println!("Bot: {}", bot.name);
+//!     Ok(())
+//! }
+//! ```
+//!
+//! # Blocking Mode
+//!
+//! Enable the `blocking` feature and disable default features:
+//!
+//! ```toml
+//! [dependencies]
+//! topstats = { version = "0.1", default-features = false, features = ["blocking", "ureq-client"] }
+//! ```
+//!
+//! ```rust,ignore
+//! use topstats::Client;
+//!
+//! fn main() -> Result<(), topstats::Error> {
+//!     let client = Client::new("your-api-token")?;
+//!     let bot = client.get_bot("432610292342587392")?;
+//!     println!("Bot: {}", bot.name);
+//!     Ok(())
+//! }
+//! ```
 
 use std::sync::Arc;
 use std::time::Duration;
 
 use crate::endpoints;
 use crate::error::{ApiErrorResponse, Error, Result};
-use crate::http::{HttpClient, Request, Response};
+use crate::http::{Request, Response};
 use crate::models::{
     Bot, CompareHistoricalResponse, DataType, HistoricalDataResponse, RankedBot, RankingsQuery,
     RankingsResponse, RecentDataResponse, TimeFrame, UserBotsResponse,
 };
-use crate::rate_limiter::{RateLimiterManager, MAX_DELAY_THRESHOLD};
 use crate::{user_agent, DEFAULT_BASE_URL};
 
-#[cfg(feature = "reqwest-client")]
-use crate::http::ReqwestClient;
+/// Default maximum delay threshold before returning an error (in seconds).
+pub const MAX_DELAY_THRESHOLD: f64 = 10.0;
+
+/// Sleep for the given number of milliseconds.
+/// Uses futures-timer in async mode, `std::thread::sleep` in blocking mode.
+#[maybe_async::maybe_async]
+async fn sleep_ms(ms: u64) {
+    #[cfg(not(feature = "blocking"))]
+    {
+        futures_timer::Delay::new(Duration::from_millis(ms)).await;
+    }
+    #[cfg(feature = "blocking")]
+    {
+        std::thread::sleep(Duration::from_millis(ms));
+    }
+}
 
 /// Configuration options for the `TopStats` client.
 #[derive(Debug, Clone)]
@@ -81,81 +132,66 @@ impl ClientBuilder {
         self
     }
 
-    /// Builds the client with the default HTTP backend (reqwest).
+    /// Builds the client with the reqwest HTTP backend (async mode).
     ///
     /// # Errors
     ///
     /// Returns an error if the token is empty or if the HTTP client cannot be created.
-    #[cfg(feature = "reqwest-client")]
-    pub fn build(self) -> Result<Client<ReqwestClient>> {
+    #[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
+    pub fn build(self) -> Result<Client<crate::http::ReqwestClient>> {
         if self.config.token.is_empty() {
             return Err(Error::InvalidToken);
         }
 
-        let http_client = ReqwestClient::new()?;
+        let http_client = crate::http::ReqwestClient::new()?;
         Ok(Client {
             config: self.config,
             http_client: Arc::new(http_client),
-            rate_limiter: RateLimiterManager::new(),
         })
     }
 
-    /// Builds the client with a custom HTTP client.
+    /// Builds the client with the ureq HTTP backend (blocking mode).
     ///
     /// # Errors
     ///
     /// Returns an error if the token is empty.
-    pub fn build_with_client<H: HttpClient>(self, http_client: H) -> Result<Client<H>> {
+    #[cfg(all(feature = "ureq-client", feature = "blocking"))]
+    pub fn build(self) -> Result<Client<crate::http::UreqClient>> {
         if self.config.token.is_empty() {
             return Err(Error::InvalidToken);
         }
 
+        let http_client = crate::http::UreqClient::new();
         Ok(Client {
             config: self.config,
             http_client: Arc::new(http_client),
-            rate_limiter: RateLimiterManager::new(),
         })
     }
 }
 
 /// The main client for interacting with the `TopStats` API.
 ///
-/// # Example
-///
-/// ```rust,no_run
-/// use topstats::Client;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<(), topstats::Error> {
-///     let client = Client::new("your-api-token")?;
-///     
-///     let bot = client.get_bot("432610292342587392").await?;
-///     println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
-///     
-///     Ok(())
-/// }
-/// ```
+/// In async mode (default), methods return futures that must be `.await`ed.
+/// In blocking mode (with `blocking` feature), methods return results directly.
 #[derive(Debug)]
-#[allow(clippy::struct_field_names)]
-pub struct Client<H: HttpClient> {
+pub struct Client<H> {
     config: ClientConfig,
     http_client: Arc<H>,
-    rate_limiter: RateLimiterManager,
 }
 
-impl<H: HttpClient> Clone for Client<H> {
+impl<H> Clone for Client<H> {
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
             http_client: Arc::clone(&self.http_client),
-            rate_limiter: self.rate_limiter.clone(),
         }
     }
 }
 
-#[cfg(feature = "reqwest-client")]
-impl Client<ReqwestClient> {
-    /// Creates a new client with the given API token.
+// Async mode with reqwest
+#[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
+impl Client<crate::http::ReqwestClient> {
+    /// Creates a new async client with the given API token.
     ///
     /// # Errors
     ///
@@ -171,7 +207,53 @@ impl Client<ReqwestClient> {
     }
 }
 
-impl<H: HttpClient> Client<H> {
+// Blocking mode with ureq
+#[cfg(all(feature = "ureq-client", feature = "blocking"))]
+impl Client<crate::http::UreqClient> {
+    /// Creates a new blocking client with the given API token.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the token is empty.
+    pub fn new(token: impl Into<String>) -> Result<Self> {
+        ClientBuilder::new().token(token).build()
+    }
+
+    /// Creates a new client builder.
+    #[must_use]
+    pub fn builder() -> ClientBuilder {
+        ClientBuilder::new()
+    }
+}
+
+/// Trait abstracting over async and sync HTTP clients.
+///
+/// This allows the endpoint implementations to be generic over the HTTP client type.
+#[maybe_async::maybe_async]
+pub trait MaybeHttpClient: Send + Sync {
+    /// Sends an HTTP request and returns the response.
+    async fn send_request(&self, request: Request) -> Result<Response>;
+}
+
+#[maybe_async::async_impl]
+impl<H: crate::http::HttpClient + Send + Sync> MaybeHttpClient for Arc<H> {
+    async fn send_request(&self, request: Request) -> Result<Response> {
+        self.send(request).await
+    }
+}
+
+#[maybe_async::sync_impl]
+impl<H: crate::http::BlockingHttpClient + Send + Sync> MaybeHttpClient for Arc<H> {
+    fn send_request(&self, request: Request) -> Result<Response> {
+        self.send(request)
+    }
+}
+
+// Core implementation using maybe_async
+impl<H> Client<H>
+where
+    Arc<H>: MaybeHttpClient,
+{
     /// Returns the current configuration.
     #[must_use]
     pub const fn config(&self) -> &ClientConfig {
@@ -179,24 +261,10 @@ impl<H: HttpClient> Client<H> {
     }
 
     /// Makes an authenticated request to the API.
+    #[maybe_async::maybe_async]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     async fn request(&self, endpoint: &str, query: &[(&str, &str)]) -> Result<Response> {
         let url = format!("{}{}", self.config.base_url, endpoint);
-
-        // Check rate limiter
-        if self.config.auto_retry {
-            if let Some(wait_time) = self.rate_limiter.check(endpoint).await {
-                if wait_time.as_secs_f64() > self.config.max_delay_threshold {
-                    return Err(Error::RateLimited {
-                        retry_after: wait_time.as_secs_f64(),
-                        message: "Rate limit exceeded".to_string(),
-                    });
-                }
-                // Auto-wait for short delays
-                #[cfg(feature = "tracing")]
-                tracing::debug!("Rate limited, waiting {:?}", wait_time);
-                futures_timer::Delay::new(wait_time).await;
-            }
-        }
 
         let mut request = Request::get(&url)
             .header("Authorization", &self.config.token)
@@ -210,25 +278,26 @@ impl<H: HttpClient> Client<H> {
         #[cfg(feature = "tracing")]
         tracing::debug!("Making request to {}", url);
 
-        let response = self.http_client.send(request).await?;
+        let response = self.http_client.send_request(request).await?;
 
         // Handle error responses
         if !response.is_success() {
             let error_response: ApiErrorResponse = response.json()?;
 
-            // Record rate limit if applicable
+            // Auto-retry for short rate limit delays
             if response.is_rate_limited() {
                 if let Some(expires_in) = error_response.expires_in {
-                    self.rate_limiter
-                        .record_rate_limit(endpoint, Duration::from_secs_f64(expires_in))
-                        .await;
-
-                    // Auto-retry for short delays
                     if self.config.auto_retry && expires_in <= self.config.max_delay_threshold {
                         #[cfg(feature = "tracing")]
                         tracing::debug!("Rate limited, auto-retrying after {}s", expires_in);
-                        futures_timer::Delay::new(Duration::from_secs_f64(expires_in)).await;
+                        
+                        // Sleep and retry
+                        sleep_ms((expires_in * 1000.0) as u64).await;
+                        
+                        #[cfg(not(feature = "blocking"))]
                         return Box::pin(self.request(endpoint, query)).await;
+                        #[cfg(feature = "blocking")]
+                        return self.request(endpoint, query);
                     }
                 }
             }
@@ -250,6 +319,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
+    #[maybe_async::maybe_async]
     pub async fn get_bot(&self, bot_id: &str) -> Result<Bot> {
         endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}");
@@ -268,6 +338,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
+    #[maybe_async::maybe_async]
     pub async fn get_bot_historical(
         &self,
         bot_id: &str,
@@ -299,6 +370,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
+    #[maybe_async::maybe_async]
     pub async fn get_bot_recent(&self, bot_id: &str) -> Result<RecentDataResponse> {
         endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}/recent");
@@ -317,6 +389,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the query is invalid or the request fails.
+    #[maybe_async::maybe_async]
     #[allow(clippy::needless_pass_by_value)]
     pub async fn get_rankings(&self, query: RankingsQuery) -> Result<RankingsResponse> {
         query.validate()?;
@@ -339,6 +412,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the request fails.
+    #[maybe_async::maybe_async]
     pub async fn search_bots(
         &self,
         query: &str,
@@ -362,6 +436,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the request fails.
+    #[maybe_async::maybe_async]
     pub async fn search_by_tag(
         &self,
         tag: &str,
@@ -386,6 +461,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the number of IDs is invalid or the request fails.
+    #[maybe_async::maybe_async]
     pub async fn compare_bots(&self, bot_ids: &[&str]) -> Result<Vec<RankedBot>> {
         endpoints::validate_compare_count(bot_ids.len())?;
         for id in bot_ids {
@@ -410,6 +486,7 @@ impl<H: HttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the number of IDs is invalid or the request fails.
+    #[maybe_async::maybe_async]
     pub async fn compare_bots_historical(
         &self,
         bot_ids: &[&str],
@@ -451,6 +528,7 @@ impl<H: HttpClient> Client<H> {
     ///
     /// Data may be inaccurate as bots transferred to teams still appear
     /// on the original owner's account.
+    #[maybe_async::maybe_async]
     pub async fn get_user_bots(&self, user_id: &str) -> Result<UserBotsResponse> {
         endpoints::validate_bot_id(user_id)?; // User IDs are also snowflakes
         let endpoint = format!("/discord/users/{user_id}/bots");
