@@ -1,4 +1,4 @@
-//! # TopStats Rust SDK
+//! # `TopStats` Rust SDK
 //!
 //! A Rust SDK for interacting with the [TopStats.gg API](https://topstats.gg),
 //! which provides statistics for Discord bots listed on Top.gg.
@@ -19,7 +19,7 @@
 //!
 //! #[tokio::main]
 //! async fn main() -> Result<(), topstats::Error> {
-//!     let client = Client::new("your-api-token");
+//!     let client = Client::new("your-api-token")?;
 //!     
 //!     // Get bot information
 //!     let bot = client.get_bot("432610292342587392").await?;
@@ -51,6 +51,7 @@
 #![allow(clippy::similar_names)]
 #![allow(clippy::module_name_repetitions)]
 
+mod client;
 pub mod error;
 pub mod models;
 
@@ -58,10 +59,11 @@ mod http;
 mod rate_limiter;
 
 // Re-exports
+pub use client::{Client, ClientBuilder, ClientConfig};
 pub use error::{Error, Result};
 pub use models::*;
 
-/// The default base URL for the TopStats API.
+/// The default base URL for the `TopStats` API.
 pub const DEFAULT_BASE_URL: &str = "https://api.topstats.gg";
 
 /// The SDK version.
@@ -71,7 +73,6 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[must_use]
 pub fn user_agent() -> String {
     format!(
-        "topstats-rs/{} (https://github.com/top-stats/rust-sdk)",
-        VERSION
+        "topstats-rs/{VERSION} (https://github.com/top-stats/rust-sdk)"
     )
 }

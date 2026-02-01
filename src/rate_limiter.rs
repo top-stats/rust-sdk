@@ -50,7 +50,7 @@ impl RateLimiter {
     fn refill(&mut self) {
         let now = Instant::now();
         let elapsed = now.duration_since(self.last_refill).as_secs_f64();
-        self.tokens = (self.tokens + elapsed * self.refill_rate).min(f64::from(self.max_tokens));
+        self.tokens = elapsed.mul_add(self.refill_rate, self.tokens).min(f64::from(self.max_tokens));
         self.last_refill = now;
     }
 
@@ -70,6 +70,7 @@ impl RateLimiter {
 
     /// Returns the current number of available tokens.
     #[must_use]
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
     pub fn available_tokens(&mut self) -> u32 {
         self.refill();
         self.tokens as u32

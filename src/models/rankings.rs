@@ -61,7 +61,7 @@ impl fmt::Display for SortOrder {
 }
 
 /// A bot entry in the rankings.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RankedBot {
     /// The bot's Discord ID.
     pub id: String,
@@ -101,7 +101,7 @@ pub struct RankedBot {
 }
 
 /// Response from the rankings endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RankingsResponse {
     /// Total number of bots tracked.
     #[serde(rename = "totalBotCount")]

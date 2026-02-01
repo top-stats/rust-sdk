@@ -31,7 +31,7 @@ impl ReqwestClient {
     /// # Errors
     ///
     /// Returns an error if the client cannot be created.
-    pub fn with_client(client: Client) -> Self {
+    pub const fn with_client(client: Client) -> Self {
         Self { client }
     }
 }

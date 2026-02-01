@@ -1,6 +1,6 @@
-//! Data models for the TopStats API.
+//! Data models for the `TopStats` API.
 //!
-//! This module contains all the types used to represent data from the TopStats API,
+//! This module contains all the types used to represent data from the `TopStats` API,
 //! including bots, historical data, rankings, and more.
 
 mod bot;

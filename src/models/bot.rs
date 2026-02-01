@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
-/// Full bot data from the TopStats API.
+/// Full bot data from the `TopStats` API.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Bot {
     /// The bot's Discord ID.
@@ -100,7 +100,7 @@ pub struct PercentageChanges {
 }
 
 /// A partial bot with basic information (used in rankings and comparisons).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PartialBot {
     /// The bot's Discord ID.
     pub id: String,
@@ -134,6 +134,7 @@ impl Bot {
     /// Validates that the given string is a valid Discord bot ID (snowflake).
     ///
     /// Discord snowflakes are 17-19 digit integers.
+    #[must_use]
     pub fn validate_id(id: &str) -> bool {
         id.len() >= 17 && id.len() <= 19 && id.chars().all(|c| c.is_ascii_digit())
     }
@@ -141,6 +142,7 @@ impl Bot {
     /// Returns the creation timestamp of this bot based on its Discord snowflake ID.
     ///
     /// Discord snowflakes encode the creation timestamp in the first 42 bits.
+    #[must_use]
     pub fn created_at(&self) -> Option<DateTime<Utc>> {
         snowflake_to_datetime(&self.id)
     }
@@ -148,16 +150,19 @@ impl Bot {
 
 impl PartialBot {
     /// Returns the creation timestamp of this bot based on its Discord snowflake ID.
+    #[must_use]
     pub fn created_at(&self) -> Option<DateTime<Utc>> {
         snowflake_to_datetime(&self.id)
     }
 }
 
-/// Converts a Discord snowflake ID to a DateTime.
+/// Discord epoch: 2015-01-01T00:00:00Z in milliseconds.
+const DISCORD_EPOCH: i64 = 1_420_070_400_000;
+
+/// Converts a Discord snowflake ID to a `DateTime`.
 fn snowflake_to_datetime(id: &str) -> Option<DateTime<Utc>> {
     let snowflake: u64 = id.parse().ok()?;
-    // Discord epoch: 2015-01-01T00:00:00Z
-    const DISCORD_EPOCH: i64 = 1420070400000;
+    #[allow(clippy::cast_possible_wrap)]
     let timestamp_ms = ((snowflake >> 22) as i64) + DISCORD_EPOCH;
     DateTime::from_timestamp_millis(timestamp_ms)
 }

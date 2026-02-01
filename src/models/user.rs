@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 /// A bot owned by a user.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UserBot {
     /// The bot's Discord ID.
     pub id: String,
@@ -64,7 +64,7 @@ pub struct UserBot {
 }
 
 /// Response from the user bots endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UserBotsResponse {
     /// List of bots owned by the user.
     pub bots: Vec<UserBot>,

@@ -1,11 +1,11 @@
-//! Error types for the TopStats SDK.
+//! Error types for the `TopStats` SDK.
 
 use thiserror::Error;
 
-/// A specialized Result type for TopStats operations.
+/// A specialized Result type for `TopStats` operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// The main error type for the TopStats SDK.
+/// The main error type for the `TopStats` SDK.
 #[derive(Error, Debug)]
 pub enum Error {
     /// The API returned a rate limit response.
@@ -80,25 +80,28 @@ pub enum Error {
 
 impl Error {
     /// Returns `true` if this error is a rate limit error.
-    pub fn is_rate_limited(&self) -> bool {
-        matches!(self, Error::RateLimited { .. })
+    #[must_use] 
+    pub const fn is_rate_limited(&self) -> bool {
+        matches!(self, Self::RateLimited { .. })
     }
 
     /// Returns `true` if this error is a not found error.
-    pub fn is_not_found(&self) -> bool {
-        matches!(self, Error::NotFound { .. })
+    #[must_use] 
+    pub const fn is_not_found(&self) -> bool {
+        matches!(self, Self::NotFound { .. })
     }
 
     /// Returns the retry-after duration in seconds if this is a rate limit error.
-    pub fn retry_after(&self) -> Option<f64> {
+    #[must_use] 
+    pub const fn retry_after(&self) -> Option<f64> {
         match self {
-            Error::RateLimited { retry_after, .. } => Some(*retry_after),
+            Self::RateLimited { retry_after, .. } => Some(*retry_after),
             _ => None,
         }
     }
 }
 
-/// API error response structure from the TopStats API.
+/// API error response structure from the `TopStats` API.
 #[derive(Debug, serde::Deserialize)]
 pub(crate) struct ApiErrorResponse {
     pub code: u16,
@@ -110,17 +113,17 @@ pub(crate) struct ApiErrorResponse {
 impl From<ApiErrorResponse> for Error {
     fn from(response: ApiErrorResponse) -> Self {
         match response.code {
-            429 => Error::RateLimited {
+            429 => Self::RateLimited {
                 retry_after: response.expires_in.unwrap_or(0.0),
                 message: response.message,
             },
-            404 => Error::NotFound {
+            404 => Self::NotFound {
                 message: response.message,
             },
-            403 => Error::Forbidden {
+            403 => Self::Forbidden {
                 message: response.message,
             },
-            status => Error::Http {
+            status => Self::Http {
                 status,
                 message: response.message,
             },

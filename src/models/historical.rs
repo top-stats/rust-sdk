@@ -113,7 +113,7 @@ impl fmt::Display for DataType {
 }
 
 /// A single historical data point.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HistoricalDataPoint {
     /// Timestamp of this data point.
     pub time: DateTime<Utc>,
@@ -148,7 +148,7 @@ impl HistoricalDataPoint {
 }
 
 /// Response from the historical data endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct HistoricalDataResponse {
     /// Array of historical data points.
     pub data: Vec<HistoricalDataPoint>,
@@ -156,7 +156,7 @@ pub struct HistoricalDataResponse {
 
 /// Response from the compare historical endpoint.
 /// Maps bot IDs to their historical data points.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompareHistoricalResponse {
     /// Map of bot ID to historical data points.
     pub data: std::collections::HashMap<String, Vec<HistoricalDataPoint>>,
