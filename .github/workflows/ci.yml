@@ -108,6 +108,64 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
+  machete:
+    name: Unused Deps
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-machete
+      - run: cargo machete
+
+  audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+  deny:
+    name: Cargo Deny
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  typos:
+    name: Typos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crate-ci/typos@master
+
+  semver:
+    name: Semver (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [async, blocking]
+        include:
+          - mode: async
+            features: async,reqwest-client,rustls-tls
+          - mode: blocking
+            features: blocking,ureq-client
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: semver-${{ matrix.mode }}
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          feature-group: only-explicit-features
+          features: ${{ matrix.features }}
+
   markdownlint:
     name: Markdown
     runs-on: ubuntu-latest

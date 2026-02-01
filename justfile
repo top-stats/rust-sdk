@@ -29,6 +29,33 @@ lint-blocking:
 # Run clippy for both modes
 lint-all: lint lint-blocking
 
+# Check for unused dependencies
+machete:
+    cargo machete
+
+# Security audit
+audit:
+    cargo audit
+
+# Check licenses and dependencies
+deny:
+    cargo deny check
+
+# Check for typos
+typos:
+    typos
+
+# Check for semver violations (async mode)
+semver:
+    cargo semver-checks --only-explicit-features --features async,reqwest-client,rustls-tls
+
+# Check for semver violations (blocking mode)
+semver-blocking:
+    cargo semver-checks --only-explicit-features --features blocking,ureq-client
+
+# Check for semver violations (both modes)
+semver-all: semver semver-blocking
+
 # Check formatting
 fmt-check:
     cargo fmt --check
@@ -77,7 +104,7 @@ check-blocking:
     cargo check --no-default-features --features "blocking,ureq-client"
 
 # Full CI check (what CI would run)
-ci: fmt-check lint-all test-all
+ci: fmt-check lint-all test-all machete deny typos
     @echo "All CI checks passed!"
 
 # Run CI workflow locally with act

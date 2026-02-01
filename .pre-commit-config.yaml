@@ -24,6 +24,25 @@ repos:
         types: [rust]
         pass_filenames: false
 
+      - id: cargo-machete
+        name: cargo machete
+        entry: cargo machete
+        language: system
+        types: [rust]
+        pass_filenames: false
+
+      - id: cargo-deny
+        name: cargo deny
+        entry: cargo deny check
+        language: system
+        pass_filenames: false
+
+      - id: typos
+        name: typos
+        entry: typos
+        language: system
+        pass_filenames: false
+
       - id: cargo-check
         name: cargo check & clippy & test (both modes)
         entry: bash -c 'cargo clippy -- -D warnings && cargo nextest run --lib && cargo clippy --no-default-features --features "blocking,ureq-client" -- -D warnings && cargo nextest run --no-default-features --features "blocking,ureq-client" --lib'
