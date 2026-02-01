@@ -22,7 +22,7 @@ ureq-client = ["dep:ureq", "blocking"]
 blocking = ["reqwest?/blocking"]
 
 # TLS backends (for reqwest)
-rustls-tls = ["reqwest?/rustls-tls"]
+rustls-tls = ["reqwest?/rustls"]
 native-tls = ["reqwest?/native-tls"]
 
 # Optional features
@@ -34,7 +34,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 # Error handling
-thiserror = "1.0"
+thiserror = "2.0"
 
 # Async
 async-trait = "0.1"
@@ -42,8 +42,8 @@ futures = "0.3"
 futures-timer = "3.0"
 
 # HTTP clients (feature-gated)
-reqwest = { version = "0.12", default-features = false, features = ["json"], optional = true }
-ureq = { version = "2.9", features = ["json"], optional = true }
+reqwest = { version = "0.13", default-features = false, features = ["json", "query"], optional = true }
+ureq = { version = "3.0", features = ["json"], optional = true }
 urlencoding = "2.1"
 
 # Logging (optional)

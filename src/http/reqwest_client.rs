@@ -96,8 +96,12 @@ impl HttpClient for ReqwestClient {
 
 #[cfg(all(feature = "blocking", feature = "reqwest-client"))]
 mod blocking_impl {
-    use super::*;
+    use std::collections::HashMap;
+
+    use super::{Method, Request, Response};
+    use crate::error::Result;
     use crate::http::BlockingHttpClient;
+    use crate::user_agent;
 
     /// Blocking HTTP client implementation using reqwest.
     #[derive(Debug, Clone)]

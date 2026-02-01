@@ -275,6 +275,7 @@ impl<H: BlockingHttpClient> Client<H> {
     /// # Errors
     ///
     /// Returns an error if the query is invalid or the request fails.
+    #[allow(clippy::needless_pass_by_value)]
     pub fn get_rankings(&self, query: RankingsQuery) -> Result<RankingsResponse> {
         query.validate()?;
 

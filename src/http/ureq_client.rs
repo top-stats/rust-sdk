@@ -7,7 +7,7 @@ use crate::error::{Error, Result};
 use crate::user_agent;
 
 /// Blocking HTTP client implementation using ureq.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct UreqClient {
     agent: ureq::Agent,
 }
@@ -16,8 +16,12 @@ impl UreqClient {
     /// Creates a new ureq client with default settings.
     #[must_use]
     pub fn new() -> Self {
-        let agent = ureq::AgentBuilder::new().user_agent(&user_agent()).build();
-
+        // Configure agent to not treat HTTP errors as Rust errors
+        // so we can handle them ourselves
+        let config = ureq::Agent::config_builder()
+            .http_status_as_error(false)
+            .build();
+        let agent = ureq::Agent::new_with_config(config);
         Self { agent }
     }
 
@@ -30,13 +34,6 @@ impl UreqClient {
 
 impl Default for UreqClient {
     fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Clone for UreqClient {
-    fn clone(&self) -> Self {
-        // ureq::Agent doesn't implement Clone, so we create a new one
         Self::new()
     }
 }
@@ -62,29 +59,43 @@ impl BlockingHttpClient for UreqClient {
             url.push_str(&query_string);
         }
 
-        let mut req = match request.method {
-            Method::Get => self.agent.get(&url),
-            Method::Post => self.agent.post(&url),
+        // Build the request based on method
+        let result = match request.method {
+            Method::Get => {
+                let mut builder = self.agent.get(&url);
+
+                // Add headers
+                for (key, value) in &request.headers {
+                    builder = builder.header(key.as_str(), value.as_str());
+                }
+                builder = builder.header("User-Agent", &user_agent());
+
+                builder.call()
+            }
+            Method::Post => {
+                let mut builder = self.agent.post(&url);
+
+                // Add headers
+                for (key, value) in &request.headers {
+                    builder = builder.header(key.as_str(), value.as_str());
+                }
+                builder = builder.header("User-Agent", &user_agent());
+
+                if let Some(body) = request.body {
+                    builder.send(body.as_bytes())
+                } else {
+                    builder.send(&[] as &[u8])
+                }
+            }
         };
 
-        // Add headers
-        for (key, value) in &request.headers {
-            req = req.set(key, value);
-        }
-
-        // Send request
-        let response = if let Some(body) = request.body {
-            req.send_string(&body)
-        } else {
-            req.call()
-        };
-
-        match response {
+        match result {
             Ok(resp) => {
-                let status = resp.status();
+                let status = resp.status().as_u16();
                 let headers = extract_headers(&resp);
                 let body = resp
-                    .into_string()
+                    .into_body()
+                    .read_to_string()
                     .map_err(|e| Error::Network(e.to_string()))?;
 
                 Ok(Response {
@@ -93,29 +104,19 @@ impl BlockingHttpClient for UreqClient {
                     body,
                 })
             }
-            Err(ureq::Error::Status(status, resp)) => {
-                let headers = extract_headers(&resp);
-                let body = resp
-                    .into_string()
-                    .map_err(|e| Error::Network(e.to_string()))?;
-
-                Ok(Response {
-                    status,
-                    headers,
-                    body,
-                })
-            }
-            Err(e) => Err(Error::Ureq(Box::new(e))),
+            Err(e) => Err(Error::Network(e.to_string())),
         }
     }
 }
 
-fn extract_headers(resp: &ureq::Response) -> HashMap<String, String> {
-    resp.headers_names()
+fn extract_headers(resp: &ureq::http::Response<ureq::Body>) -> HashMap<String, String> {
+    resp.headers()
         .iter()
-        .filter_map(|name| {
-            resp.header(name)
-                .map(|value| (name.to_string(), value.to_string()))
+        .filter_map(|(name, value)| {
+            value
+                .to_str()
+                .ok()
+                .map(|v| (name.as_str().to_string(), v.to_string()))
         })
         .collect()
 }
