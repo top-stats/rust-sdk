@@ -13,6 +13,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   MSRV: "1.70"
+  BLOCKING_FEATURES: --no-default-features --features "blocking,ureq-client"
 
 jobs:
   fmt:
@@ -35,11 +36,6 @@ jobs:
       matrix:
         rust: [stable, nightly]
         mode: [async, blocking]
-        include:
-          - mode: async
-            features: ""
-          - mode: blocking
-            features: --no-default-features --features "blocking,ureq-client"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -49,7 +45,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: ${{ matrix.mode }}-${{ matrix.rust }}
-      - run: cargo clippy ${{ matrix.features }} --all-targets -- -D warnings
+      - name: Run clippy
+        run: cargo clippy ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }} --all-targets -- -D warnings
 
   test:
     name: Test (${{ matrix.mode }}, ${{ matrix.rust }})
@@ -61,11 +58,6 @@ jobs:
       matrix:
         rust: [stable, nightly]
         mode: [async, blocking]
-        include:
-          - mode: async
-            features: ""
-          - mode: blocking
-            features: --no-default-features --features "blocking,ureq-client"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -75,7 +67,8 @@ jobs:
         with:
           key: ${{ matrix.mode }}-${{ matrix.rust }}
       - uses: taiki-e/install-action@nextest
-      - run: cargo nextest run ${{ matrix.features }} --lib
+      - name: Run tests
+        run: cargo nextest run ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }} --lib
 
   msrv:
     name: MSRV (${{ matrix.mode }})
@@ -85,11 +78,6 @@ jobs:
       fail-fast: false
       matrix:
         mode: [async, blocking]
-        include:
-          - mode: async
-            features: ""
-          - mode: blocking
-            features: --no-default-features --features "blocking,ureq-client"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
@@ -98,7 +86,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           key: msrv-${{ matrix.mode }}
-      - run: cargo check ${{ matrix.features }}
+      - name: Check MSRV
+        run: cargo check ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }}
 
   docs:
     name: Docs (${{ matrix.mode }})
@@ -108,18 +97,14 @@ jobs:
       fail-fast: false
       matrix:
         mode: [async, blocking]
-        include:
-          - mode: async
-            features: ""
-          - mode: blocking
-            features: --no-default-features --features "blocking,ureq-client"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           key: docs-${{ matrix.mode }}
-      - run: cargo doc --no-deps ${{ matrix.features }}
+      - name: Build docs
+        run: cargo doc --no-deps ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }}
         env:
           RUSTDOCFLAGS: -D warnings
 

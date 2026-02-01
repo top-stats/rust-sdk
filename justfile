@@ -52,9 +52,13 @@ build-all: build build-blocking
 build-release:
     cargo build --release
 
-# Run example (requires TOPSTATS_TOKEN env var)
+# Run async example (requires TOPSTATS_TOKEN env var)
 example:
-    cargo run --example basic_usage
+    cargo run --manifest-path examples/async/Cargo.toml
+
+# Run blocking example (requires TOPSTATS_TOKEN env var)
+example-blocking:
+    cargo run --manifest-path examples/blocking/Cargo.toml
 
 # Generate documentation
 doc:
@@ -75,3 +79,11 @@ check-blocking:
 # Full CI check (what CI would run)
 ci: fmt-check lint-all test-all
     @echo "All CI checks passed!"
+
+# Run CI workflow locally with act
+act *args:
+    act {{args}}
+
+# List available CI jobs
+act-list:
+    act -l
