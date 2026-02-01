@@ -80,19 +80,19 @@ pub enum Error {
 
 impl Error {
     /// Returns `true` if this error is a rate limit error.
-    #[must_use] 
+    #[must_use]
     pub const fn is_rate_limited(&self) -> bool {
         matches!(self, Self::RateLimited { .. })
     }
 
     /// Returns `true` if this error is a not found error.
-    #[must_use] 
+    #[must_use]
     pub const fn is_not_found(&self) -> bool {
         matches!(self, Self::NotFound { .. })
     }
 
     /// Returns the retry-after duration in seconds if this is a rate limit error.
-    #[must_use] 
+    #[must_use]
     pub const fn retry_after(&self) -> Option<f64> {
         match self {
             Self::RateLimited { retry_after, .. } => Some(*retry_after),

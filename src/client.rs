@@ -53,18 +53,23 @@ use crate::{user_agent, DEFAULT_BASE_URL};
 /// Default maximum delay threshold before returning an error (in seconds).
 pub const MAX_DELAY_THRESHOLD: f64 = 10.0;
 
-/// Sleep for the given number of milliseconds.
-/// Uses futures-timer in async mode, `std::thread::sleep` in blocking mode.
-#[maybe_async::maybe_async]
+// Type alias for the default HTTP client based on features
+#[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
+type DefaultHttpClient = crate::http::ReqwestClient;
+
+#[cfg(all(feature = "ureq-client", feature = "blocking"))]
+type DefaultHttpClient = crate::http::UreqClient;
+
+/// Sleep for the given number of milliseconds (async version).
+#[cfg(not(feature = "blocking"))]
 async fn sleep_ms(ms: u64) {
-    #[cfg(not(feature = "blocking"))]
-    {
-        futures_timer::Delay::new(Duration::from_millis(ms)).await;
-    }
-    #[cfg(feature = "blocking")]
-    {
-        std::thread::sleep(Duration::from_millis(ms));
-    }
+    futures_timer::Delay::new(Duration::from_millis(ms)).await;
+}
+
+/// Sleep for the given number of milliseconds (blocking version).
+#[cfg(feature = "blocking")]
+fn sleep_ms(ms: u64) {
+    std::thread::sleep(Duration::from_millis(ms));
 }
 
 /// Configuration options for the `TopStats` client.
@@ -132,36 +137,31 @@ impl ClientBuilder {
         self
     }
 
-    /// Builds the client with the reqwest HTTP backend (async mode).
+    /// Builds the client with the default HTTP backend.
+    ///
+    /// In async mode, this uses reqwest. In blocking mode, this uses ureq.
     ///
     /// # Errors
     ///
     /// Returns an error if the token is empty or if the HTTP client cannot be created.
-    #[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
-    pub fn build(self) -> Result<Client<crate::http::ReqwestClient>> {
-        if self.config.token.is_empty() {
-            return Err(Error::InvalidToken);
-        }
-
-        let http_client = crate::http::ReqwestClient::new()?;
-        Ok(Client {
-            config: self.config,
-            http_client: Arc::new(http_client),
-        })
+    #[cfg(any(
+        all(feature = "reqwest-client", not(feature = "blocking")),
+        all(feature = "ureq-client", feature = "blocking")
+    ))]
+    pub fn build(self) -> Result<Client<DefaultHttpClient>> {
+        self.build_with_client(DefaultHttpClient::new()?)
     }
 
-    /// Builds the client with the ureq HTTP backend (blocking mode).
+    /// Builds the client with a custom HTTP client.
     ///
     /// # Errors
     ///
     /// Returns an error if the token is empty.
-    #[cfg(all(feature = "ureq-client", feature = "blocking"))]
-    pub fn build(self) -> Result<Client<crate::http::UreqClient>> {
+    pub fn build_with_client<H>(self, http_client: H) -> Result<Client<H>> {
         if self.config.token.is_empty() {
             return Err(Error::InvalidToken);
         }
 
-        let http_client = crate::http::UreqClient::new();
         Ok(Client {
             config: self.config,
             http_client: Arc::new(http_client),
@@ -188,33 +188,17 @@ impl<H> Clone for Client<H> {
     }
 }
 
-// Async mode with reqwest
-#[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
-impl Client<crate::http::ReqwestClient> {
-    /// Creates a new async client with the given API token.
+// Default client constructors (work for both async and blocking modes)
+#[cfg(any(
+    all(feature = "reqwest-client", not(feature = "blocking")),
+    all(feature = "ureq-client", feature = "blocking")
+))]
+impl Client<DefaultHttpClient> {
+    /// Creates a new client with the given API token.
     ///
     /// # Errors
     ///
     /// Returns an error if the HTTP client cannot be created.
-    pub fn new(token: impl Into<String>) -> Result<Self> {
-        ClientBuilder::new().token(token).build()
-    }
-
-    /// Creates a new client builder.
-    #[must_use]
-    pub fn builder() -> ClientBuilder {
-        ClientBuilder::new()
-    }
-}
-
-// Blocking mode with ureq
-#[cfg(all(feature = "ureq-client", feature = "blocking"))]
-impl Client<crate::http::UreqClient> {
-    /// Creates a new blocking client with the given API token.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the token is empty.
     pub fn new(token: impl Into<String>) -> Result<Self> {
         ClientBuilder::new().token(token).build()
     }
@@ -290,10 +274,10 @@ where
                     if self.config.auto_retry && expires_in <= self.config.max_delay_threshold {
                         #[cfg(feature = "tracing")]
                         tracing::debug!("Rate limited, auto-retrying after {}s", expires_in);
-                        
+
                         // Sleep and retry
                         sleep_ms((expires_in * 1000.0) as u64).await;
-                        
+
                         #[cfg(not(feature = "blocking"))]
                         return Box::pin(self.request(endpoint, query)).await;
                         #[cfg(feature = "blocking")]

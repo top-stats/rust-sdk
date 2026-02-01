@@ -40,20 +40,20 @@ use topstats::{Client, RankingsQuery, SortBy};
 #[tokio::main]
 async fn main() -> Result<(), topstats::Error> {
     let client = Client::new("your-api-token")?;
-    
+
     // Get bot information
     let bot = client.get_bot("432610292342587392").await?;
     println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
-    
+
     // Get rankings
     let rankings = client
         .get_rankings(RankingsQuery::new().sort_by(SortBy::MonthlyVotes).limit(10))
         .await?;
-    
+
     for bot in &rankings.data {
         println!("#{}: {} - {} votes", bot.monthly_votes_rank, bot.name, bot.monthly_votes);
     }
-    
+
     Ok(())
 }
 ```
@@ -65,10 +65,10 @@ use topstats::Client;
 
 fn main() -> Result<(), topstats::Error> {
     let client = Client::new("your-api-token")?;
-    
+
     let bot = client.get_bot("432610292342587392")?;
     println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
-    
+
     Ok(())
 }
 ```

@@ -10,7 +10,8 @@ use topstats::{Client, DataType, RankingsQuery, SortBy, TimeFrame};
 #[tokio::main]
 async fn main() -> Result<(), topstats::Error> {
     // Get token from environment
-    let token = std::env::var("TOPSTATS_TOKEN").expect("TOPSTATS_TOKEN environment variable not set");
+    let token =
+        std::env::var("TOPSTATS_TOKEN").expect("TOPSTATS_TOKEN environment variable not set");
 
     // Create client
     let client = Client::new(token)?;
@@ -27,11 +28,19 @@ async fn main() -> Result<(), topstats::Error> {
     // Get historical data
     println!("\n=== Historical Data (Last 30 Days) ===");
     let history = client
-        .get_bot_historical("432610292342587392", TimeFrame::ThirtyDays, DataType::MonthlyVotes)
+        .get_bot_historical(
+            "432610292342587392",
+            TimeFrame::ThirtyDays,
+            DataType::MonthlyVotes,
+        )
         .await?;
     println!("Got {} data points", history.data.len());
     if let Some(first) = history.data.first() {
-        println!("  Latest: {} votes at {}", first.monthly_votes.unwrap_or(0), first.time);
+        println!(
+            "  Latest: {} votes at {}",
+            first.monthly_votes.unwrap_or(0),
+            first.time
+        );
     }
 
     // Get rankings
@@ -53,7 +62,10 @@ async fn main() -> Result<(), topstats::Error> {
         .compare_bots(&["432610292342587392", "646937666251915264"])
         .await?;
     for bot in &comparison {
-        println!("  {}: {} monthly votes (rank #{})", bot.name, bot.monthly_votes, bot.monthly_votes_rank);
+        println!(
+            "  {}: {} monthly votes (rank #{})",
+            bot.name, bot.monthly_votes, bot.monthly_votes_rank
+        );
     }
 
     println!("\nDone!");

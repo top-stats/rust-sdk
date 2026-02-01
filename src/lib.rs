@@ -19,11 +19,11 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), topstats::Error> {
 //!     let client = Client::new("your-api-token")?;
-//!     
+//!
 //!     // Get bot information
 //!     let bot = client.get_bot("432610292342587392").await?;
 //!     println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
-//!     
+//!
 //!     Ok(())
 //! }
 //! ```
@@ -106,5 +106,5 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 /// The User-Agent string sent with requests.
 #[must_use]
 pub fn user_agent() -> String {
-    format!("topstats-rs/{VERSION} (https://github.com/top-stats/rust-sdk)")
+    format!("topstats-rust-sdk/{VERSION} (https://github.com/top-stats/rust-sdk)")
 }

@@ -14,15 +14,20 @@ pub struct UreqClient {
 
 impl UreqClient {
     /// Creates a new ureq client with default settings.
-    #[must_use]
-    pub fn new() -> Self {
+    ///
+    /// # Errors
+    ///
+    /// This function is infallible but returns `Result` for API consistency
+    /// with other HTTP client implementations.
+    #[allow(clippy::unnecessary_wraps)]
+    pub fn new() -> Result<Self> {
         // Configure agent to not treat HTTP errors as Rust errors
         // so we can handle them ourselves
         let config = ureq::Agent::config_builder()
             .http_status_as_error(false)
             .build();
         let agent = ureq::Agent::new_with_config(config);
-        Self { agent }
+        Ok(Self { agent })
     }
 
     /// Creates a new ureq client with a custom agent.
@@ -34,7 +39,7 @@ impl UreqClient {
 
 impl Default for UreqClient {
     fn default() -> Self {
-        Self::new()
+        Self::new().expect("Failed to create default ureq client")
     }
 }
 
@@ -128,12 +133,12 @@ mod tests {
     #[test]
     fn test_ureq_client_creation() {
         let client = UreqClient::new();
-        let _ = client; // Just verify it doesn't panic
+        assert!(client.is_ok());
     }
 
     #[test]
     fn test_ureq_client_clone() {
-        let client = UreqClient::new();
+        let client = UreqClient::new().unwrap();
         let cloned = client.clone();
         let _ = cloned;
     }

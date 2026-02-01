@@ -52,12 +52,7 @@ impl HttpClient for ReqwestClient {
 
         // Add query parameters
         if !request.query.is_empty() {
-            builder = builder.query(
-                &request
-                    .query
-                    .iter()
-                    .collect::<Vec<(&String, &String)>>(),
-            );
+            builder = builder.query(&request.query.iter().collect::<Vec<(&String, &String)>>());
         }
 
         // Add headers
