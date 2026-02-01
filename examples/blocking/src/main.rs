@@ -1,18 +1,13 @@
 //! Blocking usage example for the TopStats SDK.
 //!
-//! Run with:
-//! ```sh
-//! TOPSTATS_TOKEN=your_token cargo run --example blocking_usage --no-default-features --features "blocking,ureq-client"
-//! ```
+//! Run with: `TOPSTATS_TOKEN=your_token cargo run`
 
 use topstats::{Client, DataType, RankingsQuery, SortBy, TimeFrame};
 
 fn main() -> Result<(), topstats::Error> {
-    // Get token from environment
     let token =
         std::env::var("TOPSTATS_TOKEN").expect("TOPSTATS_TOKEN environment variable not set");
 
-    // Create client
     let client = Client::new(token)?;
 
     // Get bot information

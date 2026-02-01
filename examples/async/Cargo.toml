@@ -1,0 +1,9 @@
+[package]
+name = "example-async"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+topstats = { path = "../.." }
+tokio = { version = "1.0", features = ["full"] }
