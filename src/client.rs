@@ -439,6 +439,7 @@ where
     /// * `query` - The search query.
     /// * `limit` - Maximum number of results (default: 50, max: 100).
     /// * `offset` - Offset for pagination.
+    /// * `include_deleted` - Whether to include bots that have been removed from Top.gg.
     ///
     /// # Errors
     ///
@@ -449,8 +450,9 @@ where
         query: &str,
         limit: Option<u32>,
         offset: Option<u32>,
+        include_deleted: Option<bool>,
     ) -> Result<Vec<Bot>> {
-        let params = endpoints::build_search_params(query, limit, offset);
+        let params = endpoints::build_search_params(query, limit, offset, include_deleted);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
         let response = self.request("/search", &query_refs).await?;
         response.json()
@@ -463,6 +465,7 @@ where
     /// * `tag` - The tag to search for.
     /// * `limit` - Maximum number of results (default: 50, max: 50).
     /// * `offset` - Offset for pagination.
+    /// * `include_deleted` - Whether to include bots that have been removed from Top.gg.
     ///
     /// # Errors
     ///
@@ -473,8 +476,9 @@ where
         tag: &str,
         limit: Option<u32>,
         offset: Option<u32>,
+        include_deleted: Option<bool>,
     ) -> Result<Vec<Bot>> {
-        let params = endpoints::build_search_params(tag, limit, offset);
+        let params = endpoints::build_search_params(tag, limit, offset, include_deleted);
         let query_refs: Vec<(&str, &str)> = params.iter().map(|(k, v)| (*k, v.as_str())).collect();
         let response = self.request("/discord/tags", &query_refs).await?;
         let tag_response: endpoints::TagResponse = response.json()?;
@@ -487,14 +491,13 @@ where
     ///
     /// # Arguments
     ///
-    /// * `bot_ids` - Array of 2-4 bot IDs to compare.
+    /// * `bot_ids` - Array of bot IDs to compare (premium users can compare up to 8).
     ///
     /// # Errors
     ///
-    /// Returns an error if the number of IDs is invalid or the request fails.
+    /// Returns an error if any bot ID is invalid or the request fails.
     #[maybe_async::maybe_async]
     pub async fn compare_bots(&self, bot_ids: &[&str]) -> Result<Vec<RankedBot>> {
-        endpoints::validate_compare_count(bot_ids.len())?;
         for id in bot_ids {
             endpoints::validate_bot_id(id)?;
         }
@@ -510,13 +513,13 @@ where
     ///
     /// # Arguments
     ///
-    /// * `bot_ids` - Array of 2-4 bot IDs to compare.
+    /// * `bot_ids` - Array of bot IDs to compare (premium users can compare up to 8).
     /// * `time_frame` - The time period to query.
     /// * `data_type` - The type of data to retrieve.
     ///
     /// # Errors
     ///
-    /// Returns an error if the number of IDs is invalid or the request fails.
+    /// Returns an error if any bot ID is invalid or the request fails.
     #[maybe_async::maybe_async]
     pub async fn compare_bots_historical(
         &self,
@@ -524,7 +527,6 @@ where
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<CompareHistoricalResponse> {
-        endpoints::validate_compare_count(bot_ids.len())?;
         for id in bot_ids {
             endpoints::validate_bot_id(id)?;
         }

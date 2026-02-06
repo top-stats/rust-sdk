@@ -41,7 +41,7 @@ pub struct Bot {
 
     /// When the bot was approved on Top.gg.
     #[serde(rename = "approved_at")]
-    pub approved_at: Option<DateTime<Utc>>,
+    pub approved_at: DateTime<Utc>,
 
     /// Bot's tags/categories.
     #[serde(default)]

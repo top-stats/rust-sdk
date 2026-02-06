@@ -3,11 +3,17 @@
 //! This module provides a trait-based abstraction over HTTP clients,
 //! allowing users to choose between different backends (reqwest, ureq).
 
-#[cfg(not(feature = "blocking"))]
-use async_trait::async_trait;
 use std::collections::HashMap;
 
 use crate::error::Result;
+
+mod traits;
+
+#[cfg(not(feature = "blocking"))]
+pub use traits::HttpClient;
+
+#[cfg(feature = "blocking")]
+pub use traits::BlockingHttpClient;
 
 #[cfg(all(feature = "reqwest-client", not(feature = "blocking")))]
 mod reqwest_client;
@@ -130,30 +136,6 @@ impl Response {
     pub fn json<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
         Ok(serde_json::from_str(&self.body)?)
     }
-}
-
-/// Trait for async HTTP clients.
-#[cfg(not(feature = "blocking"))]
-#[async_trait]
-pub trait HttpClient: Send + Sync {
-    /// Sends an HTTP request and returns the response.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails.
-    async fn send(&self, request: Request) -> Result<Response>;
-}
-
-/// Trait for blocking HTTP clients.
-#[cfg(feature = "blocking")]
-#[cfg_attr(docsrs, doc(cfg(feature = "blocking")))]
-pub trait BlockingHttpClient: Send + Sync {
-    /// Sends an HTTP request and returns the response.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the request fails.
-    fn send(&self, request: Request) -> Result<Response>;
 }
 
 #[cfg(test)]

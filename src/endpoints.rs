@@ -15,15 +15,6 @@ pub fn validate_bot_id(id: &str) -> Result<()> {
     }
 }
 
-/// Validates the number of bot IDs for comparison (2-4).
-pub fn validate_compare_count(count: usize) -> Result<()> {
-    if (2..=4).contains(&count) {
-        Ok(())
-    } else {
-        Err(Error::InvalidCompareCount(count))
-    }
-}
-
 /// Response wrapper for tag search.
 #[derive(serde::Deserialize)]
 pub struct TagResponse {
@@ -69,6 +60,7 @@ pub fn build_search_params(
     query: &str,
     limit: Option<u32>,
     offset: Option<u32>,
+    include_deleted: Option<bool>,
 ) -> Vec<(&'static str, String)> {
     let mut params: Vec<(&str, String)> = vec![("query", query.to_string())];
 
@@ -77,6 +69,9 @@ pub fn build_search_params(
     }
     if let Some(offset) = offset {
         params.push(("offset", offset.to_string()));
+    }
+    if let Some(include_deleted) = include_deleted {
+        params.push(("includeDeleted", include_deleted.to_string()));
     }
 
     params
