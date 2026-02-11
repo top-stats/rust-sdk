@@ -15,6 +15,15 @@ pub fn validate_bot_id(id: &str) -> Result<()> {
     }
 }
 
+/// Validates a Discord user ID format (17-19 digit snowflake).
+pub fn validate_user_id(id: &str) -> Result<()> {
+    if Bot::validate_id(id) {
+        Ok(())
+    } else {
+        Err(Error::InvalidUserId(id.to_string()))
+    }
+}
+
 /// Response wrapper for tag search.
 #[derive(serde::Deserialize)]
 pub struct TagResponse {

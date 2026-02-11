@@ -58,6 +58,10 @@ pub enum Error {
     #[error("Invalid Discord bot ID format: {0}. Expected 17-19 digit snowflake.")]
     InvalidBotId(String),
 
+    /// Invalid Discord user ID format.
+    #[error("Invalid Discord user ID format: {0}. Expected 17-19 digit snowflake.")]
+    InvalidUserId(String),
+
     /// The API token is missing or invalid.
     #[error("Missing or invalid API token")]
     InvalidToken,

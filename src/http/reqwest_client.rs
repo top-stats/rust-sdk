@@ -26,11 +26,7 @@ impl ReqwestClient {
         Ok(Self { client })
     }
 
-    /// Creates a new reqwest client with custom settings.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the client cannot be created.
+    /// Creates a new reqwest client wrapping an existing `reqwest::Client`.
     pub const fn with_client(client: Client) -> Self {
         Self { client }
     }

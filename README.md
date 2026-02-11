@@ -31,7 +31,7 @@ async fn main() -> Result<(), topstats::Error> {
 
     // Get rankings
     let rankings = client
-        .get_rankings(RankingsQuery::new().sort_by(SortBy::MonthlyVotes).limit(10))
+        .get_rankings(RankingsQuery::default().sort_by(SortBy::MonthlyVotes).limit(10))
         .await?;
 
     for bot in &rankings.data {

@@ -136,6 +136,22 @@ impl Response {
     pub fn json<T: serde::de::DeserializeOwned>(&self) -> Result<T> {
         Ok(serde_json::from_str(&self.body)?)
     }
+
+    /// Converts an error response into an [`Error`].
+    ///
+    /// Attempts to parse the response body as a JSON [`ApiErrorResponse`].
+    /// If parsing fails (e.g., the body is HTML from a reverse proxy),
+    /// falls back to a generic [`Error::Http`] with the status code and raw body.
+    #[must_use]
+    pub fn try_into_api_error(&self) -> crate::Error {
+        serde_json::from_str::<crate::error::ApiErrorResponse>(&self.body).map_or_else(
+            |_| crate::Error::Http {
+                status: self.status,
+                message: self.body.clone(),
+            },
+            Into::into,
+        )
+    }
 }
 
 #[cfg(test)]

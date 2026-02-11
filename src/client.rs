@@ -286,7 +286,6 @@ where
 
         let mut request = Request::get(&url)
             .header("Authorization", &self.config.token)
-            .header("Content-Type", "application/json")
             .header("User-Agent", USER_AGENT);
 
         for (key, value) in query {
@@ -300,14 +299,18 @@ where
 
         // Handle error responses
         if !response.is_success() {
-            let error_response: ApiErrorResponse = response.json()?;
+            // Try to parse as JSON API error; fall back to generic HTTP error
+            // if the body isn't JSON (e.g., HTML from a reverse proxy 502).
+            let error_response: Option<ApiErrorResponse> =
+                serde_json::from_str(&response.body).ok();
 
             // Auto-retry for short rate limit delays
             if let Some(expires_in) = error_response
-                .expires_in
+                .as_ref()
+                .and_then(|e| e.expires_in)
                 .filter(|_| response.is_rate_limited())
                 .filter(|_| self.config.auto_retry && retries_remaining > 0)
-                .filter(|&e| e <= self.config.max_delay_threshold)
+                .filter(|&e| e > 0.0 && e <= self.config.max_delay_threshold)
             {
                 #[cfg(feature = "tracing")]
                 tracing::debug!(
@@ -325,7 +328,13 @@ where
                 return self.request_with_retries(endpoint, query, retries_remaining - 1);
             }
 
-            return Err(error_response.into());
+            return Err(match error_response {
+                Some(api_err) => api_err.into(),
+                None => Error::Http {
+                    status: response.status,
+                    message: response.body,
+                },
+            });
         }
 
         Ok(response)
@@ -490,6 +499,11 @@ where
     /// Returns an error if any bot ID is invalid or the request fails.
     #[maybe_async::maybe_async]
     pub async fn compare_bots(&self, bot_ids: &[&str]) -> Result<Vec<RankedBot>> {
+        if bot_ids.is_empty() {
+            return Err(Error::InvalidInput(
+                "compare_bots requires at least one bot ID".to_string(),
+            ));
+        }
         for id in bot_ids {
             endpoints::validate_bot_id(id)?;
         }
@@ -519,6 +533,11 @@ where
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<CompareHistoricalResponse> {
+        if bot_ids.is_empty() {
+            return Err(Error::InvalidInput(
+                "compare_bots_historical requires at least one bot ID".to_string(),
+            ));
+        }
         for id in bot_ids {
             endpoints::validate_bot_id(id)?;
         }
@@ -555,7 +574,7 @@ where
     /// on the original owner's account.
     #[maybe_async::maybe_async]
     pub async fn get_user_bots(&self, user_id: &str) -> Result<UserBotsResponse> {
-        endpoints::validate_bot_id(user_id)?; // User IDs are also snowflakes
+        endpoints::validate_user_id(user_id)?;
         let endpoint = format!("/discord/users/{user_id}/bots");
         let response = self.request(&endpoint, &[]).await?;
         response.json()
@@ -600,5 +619,191 @@ mod tests {
     fn test_client_builder_max_retries() {
         let builder = ClientBuilder::new().token("test").max_retries(5);
         assert_eq!(builder.config.max_retries, 5);
+    }
+
+    /// Mock HTTP client that returns a pre-configured response.
+    struct MockHttpClient {
+        response: std::sync::Mutex<crate::http::Response>,
+        call_count: std::sync::atomic::AtomicU32,
+    }
+
+    impl MockHttpClient {
+        fn new(response: crate::http::Response) -> Self {
+            Self {
+                response: std::sync::Mutex::new(response),
+                call_count: std::sync::atomic::AtomicU32::new(0),
+            }
+        }
+
+        fn call_count(&self) -> u32 {
+            self.call_count.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    #[maybe_async::maybe_async]
+    impl MaybeHttpClient for Arc<MockHttpClient> {
+        async fn send_request(&self, _request: Request) -> crate::error::Result<Response> {
+            self.call_count
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            let resp = self.response.lock().unwrap();
+            Ok(resp.clone())
+        }
+    }
+
+    fn mock_client(response: crate::http::Response) -> Client<MockHttpClient> {
+        let mock = Arc::new(MockHttpClient::new(response));
+        Client {
+            config: ClientConfig {
+                token: "test-token".to_string(),
+                auto_retry: true,
+                max_delay_threshold: 10.0,
+                max_retries: 3,
+                ..ClientConfig::default()
+            },
+            http_client: mock,
+        }
+    }
+
+    #[maybe_async::test(feature = "blocking", async(not(feature = "blocking"), tokio::test))]
+    async fn test_negative_expires_in_does_not_retry() {
+        // A negative expires_in should NOT cause a retry loop.
+        // It should immediately return the rate limit error.
+        let response = crate::http::Response {
+            status: 429,
+            headers: std::collections::HashMap::new(),
+            body: r#"{"code": 429, "message": "Rate limited", "expiresIn": -5.0}"#.to_string(),
+        };
+
+        let client = mock_client(response);
+        let result = client.request("/test", &[]).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.is_rate_limited());
+        // Should only have been called once (no retries)
+        assert_eq!(client.http_client.call_count(), 1);
+    }
+
+    #[maybe_async::test(feature = "blocking", async(not(feature = "blocking"), tokio::test))]
+    async fn test_zero_expires_in_does_not_retry() {
+        // A zero expires_in should NOT cause a retry (would be a 0ms sleep loop).
+        let response = crate::http::Response {
+            status: 429,
+            headers: std::collections::HashMap::new(),
+            body: r#"{"code": 429, "message": "Rate limited", "expiresIn": 0.0}"#.to_string(),
+        };
+
+        let client = mock_client(response);
+        let result = client.request("/test", &[]).await;
+
+        assert!(result.is_err());
+        assert!(result.unwrap_err().is_rate_limited());
+        assert_eq!(client.http_client.call_count(), 1);
+    }
+
+    #[maybe_async::test(feature = "blocking", async(not(feature = "blocking"), tokio::test))]
+    async fn test_compare_bots_empty_slice_returns_error() {
+        // Passing an empty slice should return an error, not produce an invalid endpoint.
+        let response = crate::http::Response {
+            status: 200,
+            headers: std::collections::HashMap::new(),
+            body: r#"{"data": []}"#.to_string(),
+        };
+
+        let client = mock_client(response);
+        let result = client.compare_bots(&[]).await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::InvalidInput(msg) => {
+                assert!(
+                    msg.contains("at least one"),
+                    "Expected 'at least one' in: {msg}"
+                );
+            }
+            other => panic!("Expected Error::InvalidInput, got: {other:?}"),
+        }
+    }
+
+    #[maybe_async::test(feature = "blocking", async(not(feature = "blocking"), tokio::test))]
+    async fn test_compare_bots_historical_empty_slice_returns_error() {
+        let response = crate::http::Response {
+            status: 200,
+            headers: std::collections::HashMap::new(),
+            body: "{}".to_string(),
+        };
+
+        let client = mock_client(response);
+        let result = client
+            .compare_bots_historical(
+                &[],
+                crate::models::TimeFrame::AllTime,
+                crate::models::DataType::default(),
+            )
+            .await;
+
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            Error::InvalidInput(msg) => {
+                assert!(
+                    msg.contains("at least one"),
+                    "Expected 'at least one' in: {msg}"
+                );
+            }
+            other => panic!("Expected Error::InvalidInput, got: {other:?}"),
+        }
+    }
+
+    #[maybe_async::test(feature = "blocking", async(not(feature = "blocking"), tokio::test))]
+    async fn test_get_user_bots_invalid_id_says_user_not_bot() {
+        let response = crate::http::Response {
+            status: 200,
+            headers: std::collections::HashMap::new(),
+            body: "{}".to_string(),
+        };
+
+        let client = mock_client(response);
+        let result = client.get_user_bots("invalid").await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        // The error should mention "user ID", not "bot ID"
+        assert!(
+            err_msg.contains("user ID"),
+            "Expected error to mention 'user ID', got: {err_msg}"
+        );
+    }
+
+    #[test]
+    fn test_non_json_error_response_returns_http_error() {
+        // When the API returns a non-JSON error (e.g., HTML 502), we should get
+        // an Error::Http with the status code, not a confusing parse error.
+        let response = crate::http::Response {
+            status: 502,
+            headers: std::collections::HashMap::new(),
+            body: "<html><body>Bad Gateway</body></html>".to_string(),
+        };
+
+        let result = response.try_into_api_error();
+        match result {
+            Error::Http { status, message } => {
+                assert_eq!(status, 502);
+                assert!(message.contains("Bad Gateway"));
+            }
+            other => panic!("Expected Error::Http, got: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_json_error_response_parses_correctly() {
+        // When the API returns a proper JSON error, we should parse it normally.
+        let response = crate::http::Response {
+            status: 404,
+            headers: std::collections::HashMap::new(),
+            body: r#"{"code": 404, "message": "Bot not found"}"#.to_string(),
+        };
+
+        let result = response.try_into_api_error();
+        assert!(result.is_not_found());
     }
 }
