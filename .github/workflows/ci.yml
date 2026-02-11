@@ -5,6 +5,7 @@ on:
     branches: [master]
   pull_request:
     branches: [master]
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,163 +17,107 @@ env:
   BLOCKING_FEATURES: --no-default-features --features "blocking,ureq-client"
 
 jobs:
-  fmt:
-    name: Format
+  stable:
+    name: Stable
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          components: rustfmt
-      - run: cargo fmt --all --check
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
 
-  clippy:
-    name: Clippy (${{ matrix.mode }}, ${{ matrix.rust }})
-    needs: fmt
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy (async)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (blocking)
+        run: cargo clippy ${{ env.BLOCKING_FEATURES }} --all-targets -- -D warnings
+
+      - uses: taiki-e/install-action@nextest
+      - name: Test (async)
+        run: cargo nextest run --lib
+      - name: Test (blocking)
+        run: cargo nextest run ${{ env.BLOCKING_FEATURES }} --lib
+
+      - name: Docs (async)
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - name: Docs (blocking)
+        run: cargo doc --no-deps ${{ env.BLOCKING_FEATURES }}
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # TODO: Re-enable semver checks after v0.1.0 is published to crates.io
+  # Currently disabled because the baseline (v0.0.0) is a placeholder crate with no lib target
+  # - uses: obi1kenobi/cargo-semver-checks-action@v2
+  #   with:
+  #     feature-group: only-explicit-features
+  #     features: async,reqwest-client,rustls-tls
+  # - uses: obi1kenobi/cargo-semver-checks-action@v2
+  #   with:
+  #     feature-group: only-explicit-features
+  #     features: blocking,ureq-client
+
+  nightly:
+    name: Nightly
     runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.rust == 'nightly' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        rust: [stable, nightly]
-        mode: [async, blocking]
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: ${{ matrix.rust }}
           components: clippy
       - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.mode }}-${{ matrix.rust }}
-      - name: Run clippy
-        run: cargo clippy ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }} --all-targets -- -D warnings
 
-  test:
-    name: Test (${{ matrix.mode }}, ${{ matrix.rust }})
-    needs: fmt
-    runs-on: ubuntu-latest
-    continue-on-error: ${{ matrix.rust == 'nightly' }}
-    strategy:
-      fail-fast: false
-      matrix:
-        rust: [stable, nightly]
-        mode: [async, blocking]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: ${{ matrix.rust }}
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: ${{ matrix.mode }}-${{ matrix.rust }}
+      - name: Clippy (async)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (blocking)
+        run: cargo clippy ${{ env.BLOCKING_FEATURES }} --all-targets -- -D warnings
+
       - uses: taiki-e/install-action@nextest
-      - name: Run tests
-        run: cargo nextest run ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }} --lib
+      - name: Test (async)
+        run: cargo nextest run --lib
+      - name: Test (blocking)
+        run: cargo nextest run ${{ env.BLOCKING_FEATURES }} --lib
 
   msrv:
-    name: MSRV (${{ matrix.mode }})
-    needs: fmt
+    name: MSRV (1.85)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [async, blocking]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.MSRV }}
       - uses: Swatinem/rust-cache@v2
-        with:
-          key: msrv-${{ matrix.mode }}
-      - name: Check MSRV
-        run: cargo check ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }}
 
-  docs:
-    name: Docs (${{ matrix.mode }})
-    needs: fmt
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        mode: [async, blocking]
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          key: docs-${{ matrix.mode }}
-      - name: Build docs
-        run: cargo doc --no-deps ${{ matrix.mode == 'blocking' && env.BLOCKING_FEATURES || '' }}
-        env:
-          RUSTDOCFLAGS: -D warnings
+      - name: Check (async)
+        run: cargo check
+      - name: Check (blocking)
+        run: cargo check ${{ env.BLOCKING_FEATURES }}
 
-  machete:
-    name: Unused Deps
-    needs: fmt
+  quality:
+    name: Quality
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: taiki-e/install-action@cargo-machete
-      - run: cargo machete
 
-  audit:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
+      - name: Security Audit
+        uses: rustsec/audit-check@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-
-  deny:
-    name: Cargo Deny
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
-
-  typos:
-    name: Typos
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: crate-ci/typos@master
-
-  # TODO: Re-enable after v0.1.0 is published to crates.io
-  # Currently disabled because the baseline (v0.0.0) is a placeholder crate with no lib target
-  # semver:
-  #   name: Semver (${{ matrix.mode }})
-  #   runs-on: ubuntu-latest
-  #   strategy:
-  #     fail-fast: false
-  #     matrix:
-  #       mode: [async, blocking]
-  #       include:
-  #         - mode: async
-  #           features: async,reqwest-client,rustls-tls
-  #         - mode: blocking
-  #           features: blocking,ureq-client
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #       with:
-  #         fetch-depth: 0
-  #     - uses: dtolnay/rust-toolchain@stable
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         key: semver-${{ matrix.mode }}
-  #     - uses: obi1kenobi/cargo-semver-checks-action@v2
-  #       with:
-  #         feature-group: only-explicit-features
-  #         features: ${{ matrix.features }}
-
-  markdownlint:
-    name: Markdown
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: DavidAnson/markdownlint-cli2-action@v19
+      - name: Cargo Deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Typos
+        uses: crate-ci/typos@master
+      - name: Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v19
         with:
           globs: "**/*.md"
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-machete
+      - name: Unused Deps
+        run: cargo machete
