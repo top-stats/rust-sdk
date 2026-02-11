@@ -319,12 +319,8 @@ where
                 sleep_ms((expires_in * 1000.0) as u64).await;
 
                 #[cfg(not(feature = "blocking"))]
-                return Box::pin(self.request_with_retries(
-                    endpoint,
-                    query,
-                    retries_remaining - 1,
-                ))
-                .await;
+                return Box::pin(self.request_with_retries(endpoint, query, retries_remaining - 1))
+                    .await;
                 #[cfg(feature = "blocking")]
                 return self.request_with_retries(endpoint, query, retries_remaining - 1);
             }
