@@ -172,12 +172,10 @@ impl RankingsQuery {
     ///
     /// Returns an error if the limit is outside the valid range (1-500).
     pub fn validate(&self) -> Result<(), crate::Error> {
-        if let Some(limit) = self.limit {
-            if limit == 0 || limit > 500 {
-                return Err(crate::Error::InvalidInput(
-                    "Rankings limit must be between 1 and 500".to_string(),
-                ));
-            }
+        if let Some(limit) = self.limit.filter(|&l| l == 0 || l > 500) {
+            return Err(crate::Error::InvalidInput(format!(
+                "Rankings limit must be between 1 and 500, got {limit}"
+            )));
         }
         Ok(())
     }
