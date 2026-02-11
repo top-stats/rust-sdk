@@ -127,17 +127,6 @@ pub struct RankingsQuery {
 }
 
 impl RankingsQuery {
-    /// Creates a new rankings query with default values.
-    #[must_use]
-    pub const fn new() -> Self {
-        Self {
-            limit: None,
-            offset: None,
-            sort_by: SortBy::MonthlyVotes,
-            sort_order: SortOrder::Ascending,
-        }
-    }
-
     /// Sets the maximum number of results (1-500).
     #[must_use]
     pub const fn limit(mut self, limit: u16) -> Self {
@@ -247,7 +236,7 @@ mod tests {
 
     #[test]
     fn test_rankings_query_builder() {
-        let query = RankingsQuery::new()
+        let query = RankingsQuery::default()
             .limit(100)
             .offset(50)
             .sort_by(SortBy::TotalVotes)
@@ -261,13 +250,13 @@ mod tests {
 
     #[test]
     fn test_rankings_query_validation() {
-        let valid_query = RankingsQuery::new().limit(100);
+        let valid_query = RankingsQuery::default().limit(100);
         assert!(valid_query.validate().is_ok());
 
-        let invalid_query_zero = RankingsQuery::new().limit(0);
+        let invalid_query_zero = RankingsQuery::default().limit(0);
         assert!(invalid_query_zero.validate().is_err());
 
-        let invalid_query_too_large = RankingsQuery::new().limit(501);
+        let invalid_query_too_large = RankingsQuery::default().limit(501);
         assert!(invalid_query_too_large.validate().is_err());
     }
 

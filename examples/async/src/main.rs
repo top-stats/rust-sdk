@@ -41,7 +41,7 @@ async fn main() -> Result<(), topstats::Error> {
     // Get rankings
     println!("\n=== Top 5 Bots by Monthly Votes ===");
     let rankings = client
-        .get_rankings(RankingsQuery::new().sort_by(SortBy::MonthlyVotes).limit(5))
+        .get_rankings(RankingsQuery::default().sort_by(SortBy::MonthlyVotes).limit(5))
         .await?;
     println!("Total bots tracked: {}", rankings.total_bot_count);
     for bot in &rankings.data {
