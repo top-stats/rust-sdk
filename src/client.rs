@@ -48,7 +48,7 @@ use crate::models::{
     Bot, CompareHistoricalResponse, DataType, HistoricalDataResponse, RankedBot, RankingsQuery,
     RankingsResponse, RecentDataResponse, TimeFrame, UserBotsResponse,
 };
-use crate::{user_agent, DEFAULT_BASE_URL};
+use crate::{DEFAULT_BASE_URL, USER_AGENT};
 
 /// Default maximum delay threshold before returning an error (in seconds).
 pub const MAX_DELAY_THRESHOLD: f64 = 10.0;
@@ -198,7 +198,7 @@ impl<H> Clone for Client<H> {
     fn clone(&self) -> Self {
         Self {
             config: self.config.clone(),
-            http_client: Arc::clone(&self.http_client),
+            http_client: self.http_client.clone(),
         }
     }
 }
@@ -282,19 +282,19 @@ where
         query: &[(&str, &str)],
         retries_remaining: u32,
     ) -> Result<Response> {
-        let url = format!("{}{}", self.config.base_url, endpoint);
+        let url = format!("{}{endpoint}", self.config.base_url);
 
         let mut request = Request::get(&url)
             .header("Authorization", &self.config.token)
             .header("Content-Type", "application/json")
-            .header("User-Agent", user_agent());
+            .header("User-Agent", USER_AGENT);
 
         for (key, value) in query {
             request = request.query(*key, *value);
         }
 
         #[cfg(feature = "tracing")]
-        tracing::debug!("Making request to {}", url);
+        tracing::debug!("Making request to {url}");
 
         let response = self.http_client.send_request(request).await?;
 
@@ -303,34 +303,30 @@ where
             let error_response: ApiErrorResponse = response.json()?;
 
             // Auto-retry for short rate limit delays
-            if response.is_rate_limited() {
-                if let Some(expires_in) = error_response.expires_in {
-                    let can_retry = self.config.auto_retry
-                        && retries_remaining > 0
-                        && expires_in <= self.config.max_delay_threshold;
+            if let Some(expires_in) = error_response
+                .expires_in
+                .filter(|_| response.is_rate_limited())
+                .filter(|_| self.config.auto_retry && retries_remaining > 0)
+                .filter(|&e| e <= self.config.max_delay_threshold)
+            {
+                #[cfg(feature = "tracing")]
+                tracing::debug!(
+                    "Rate limited, auto-retrying after {expires_in}s ({} retries remaining)",
+                    retries_remaining - 1
+                );
 
-                    if can_retry {
-                        #[cfg(feature = "tracing")]
-                        tracing::debug!(
-                            "Rate limited, auto-retrying after {}s ({} retries remaining)",
-                            expires_in,
-                            retries_remaining - 1
-                        );
+                // Sleep and retry
+                sleep_ms((expires_in * 1000.0) as u64).await;
 
-                        // Sleep and retry
-                        sleep_ms((expires_in * 1000.0) as u64).await;
-
-                        #[cfg(not(feature = "blocking"))]
-                        return Box::pin(self.request_with_retries(
-                            endpoint,
-                            query,
-                            retries_remaining - 1,
-                        ))
-                        .await;
-                        #[cfg(feature = "blocking")]
-                        return self.request_with_retries(endpoint, query, retries_remaining - 1);
-                    }
-                }
+                #[cfg(not(feature = "blocking"))]
+                return Box::pin(self.request_with_retries(
+                    endpoint,
+                    query,
+                    retries_remaining - 1,
+                ))
+                .await;
+                #[cfg(feature = "blocking")]
+                return self.request_with_retries(endpoint, query, retries_remaining - 1);
             }
 
             return Err(error_response.into());
@@ -487,11 +483,11 @@ where
 
     // ==================== Compare Endpoints ====================
 
-    /// Compares multiple bots.
+    /// Compares one or more bots.
     ///
     /// # Arguments
     ///
-    /// * `bot_ids` - Array of bot IDs to compare (premium users can compare up to 8).
+    /// * `bot_ids` - Array of bot IDs to compare (up to 8 for premium users).
     ///
     /// # Errors
     ///
@@ -509,11 +505,11 @@ where
         Ok(compare_response.data)
     }
 
-    /// Compares historical data for multiple bots.
+    /// Compares historical data for one or more bots.
     ///
     /// # Arguments
     ///
-    /// * `bot_ids` - Array of bot IDs to compare (premium users can compare up to 8).
+    /// * `bot_ids` - Array of bot IDs to compare (up to 8 for premium users).
     /// * `time_frame` - The time period to query.
     /// * `data_type` - The type of data to retrieve.
     ///

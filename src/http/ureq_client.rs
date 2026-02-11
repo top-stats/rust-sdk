@@ -4,7 +4,7 @@ use std::collections::HashMap;
 
 use super::{BlockingHttpClient, Method, Request, Response};
 use crate::error::{Error, Result};
-use crate::user_agent;
+use crate::USER_AGENT;
 
 /// Blocking HTTP client implementation using ureq.
 #[derive(Debug, Clone)]
@@ -73,7 +73,7 @@ impl BlockingHttpClient for UreqClient {
                 for (key, value) in &request.headers {
                     builder = builder.header(key.as_str(), value.as_str());
                 }
-                builder = builder.header("User-Agent", &user_agent());
+                builder = builder.header("User-Agent", USER_AGENT);
 
                 builder.call()
             }
@@ -84,7 +84,7 @@ impl BlockingHttpClient for UreqClient {
                 for (key, value) in &request.headers {
                     builder = builder.header(key.as_str(), value.as_str());
                 }
-                builder = builder.header("User-Agent", &user_agent());
+                builder = builder.header("User-Agent", USER_AGENT);
 
                 if let Some(body) = request.body {
                     builder.send(body.as_bytes())

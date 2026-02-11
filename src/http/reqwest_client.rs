@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use super::{HttpClient, Method, Request, Response};
 use crate::error::Result;
-use crate::user_agent;
+use crate::USER_AGENT;
 
 /// HTTP client implementation using reqwest.
 #[derive(Debug, Clone)]
@@ -21,7 +21,7 @@ impl ReqwestClient {
     ///
     /// Returns an error if the client cannot be created.
     pub fn new() -> Result<Self> {
-        let client = Client::builder().user_agent(user_agent()).build()?;
+        let client = Client::builder().user_agent(USER_AGENT).build()?;
 
         Ok(Self { client })
     }

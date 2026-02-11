@@ -104,7 +104,5 @@ pub const DEFAULT_BASE_URL: &str = "https://api.topstats.gg";
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// The User-Agent string sent with requests.
-#[must_use]
-pub fn user_agent() -> String {
-    format!("topstats-rust-sdk/{VERSION} (https://github.com/top-stats/rust-sdk)")
-}
+pub const USER_AGENT: &str =
+    concat!("topstats-rust-sdk/", env!("CARGO_PKG_VERSION"), " (https://github.com/top-stats/rust-sdk)");
