@@ -1,0 +1,123 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  MSRV: "1.85"
+  BLOCKING_FEATURES: --no-default-features --features "blocking,ureq-client"
+
+jobs:
+  stable:
+    name: Stable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Format
+        run: cargo fmt --all --check
+
+      - name: Clippy (async)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (blocking)
+        run: cargo clippy ${{ env.BLOCKING_FEATURES }} --all-targets -- -D warnings
+
+      - uses: taiki-e/install-action@nextest
+      - name: Test (async)
+        run: cargo nextest run --lib
+      - name: Test (blocking)
+        run: cargo nextest run ${{ env.BLOCKING_FEATURES }} --lib
+
+      - name: Docs (async)
+        run: cargo doc --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - name: Docs (blocking)
+        run: cargo doc --no-deps ${{ env.BLOCKING_FEATURES }}
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  # TODO: Re-enable semver checks after v0.1.0 is published to crates.io
+  # Currently disabled because the baseline (v0.0.0) is a placeholder crate with no lib target
+  # - uses: obi1kenobi/cargo-semver-checks-action@v2
+  #   with:
+  #     feature-group: only-explicit-features
+  #     features: async,reqwest-client,rustls-tls
+  # - uses: obi1kenobi/cargo-semver-checks-action@v2
+  #   with:
+  #     feature-group: only-explicit-features
+  #     features: blocking,ureq-client
+
+  nightly:
+    name: Nightly
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Clippy (async)
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Clippy (blocking)
+        run: cargo clippy ${{ env.BLOCKING_FEATURES }} --all-targets -- -D warnings
+
+      - uses: taiki-e/install-action@nextest
+      - name: Test (async)
+        run: cargo nextest run --lib
+      - name: Test (blocking)
+        run: cargo nextest run ${{ env.BLOCKING_FEATURES }} --lib
+
+  msrv:
+    name: MSRV (1.85)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check (async)
+        run: cargo check
+      - name: Check (blocking)
+        run: cargo check ${{ env.BLOCKING_FEATURES }}
+
+  quality:
+    name: Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Security Audit
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Cargo Deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+      - name: Typos
+        uses: crate-ci/typos@master
+      - name: Markdown
+        uses: DavidAnson/markdownlint-cli2-action@v19
+        with:
+          globs: "**/*.md"
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-machete
+      - name: Unused Deps
+        run: cargo machete

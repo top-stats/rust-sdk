@@ -1,0 +1,81 @@
+[package]
+name = "topstats"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+description = "Rust SDK for the TopStats.gg API - Discord bot statistics tracking"
+homepage = "https://topstats.gg"
+repository = "https://github.com/top-stats/rust-sdk"
+documentation = "https://docs.rs/topstats"
+readme = "README.md"
+keywords = ["discord", "bot", "statistics", "topgg", "api"]
+categories = ["api-bindings", "asynchronous"]
+exclude = ["examples/", "tests/", ".github/", "justfile", "deny.toml", ".actrc"]
+
+[features]
+default = ["async", "reqwest-client", "rustls-tls"]
+
+# Async (default) or blocking mode - mutually exclusive
+async = ["dep:futures-timer"]
+blocking = ["maybe-async/is_sync"]
+
+# HTTP client backends
+reqwest-client = ["dep:reqwest"]
+ureq-client = ["dep:ureq"]
+
+# TLS backends (for reqwest)
+rustls-tls = ["reqwest?/rustls"]
+native-tls = ["reqwest?/native-tls"]
+
+# Optional features
+tracing = ["dep:tracing"]
+
+[dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+thiserror = "2.0"
+
+# Async/sync unification
+maybe-async = "0.2"
+async-trait = "0.1"
+
+# Async runtime support (only needed for async mode)
+futures-timer = { version = "3.0", optional = true }
+
+# HTTP clients (feature-gated)
+reqwest = { version = "0.13", default-features = false, features = [
+  "json",
+  "query",
+], optional = true }
+ureq = { version = "3.0", features = ["json"], optional = true }
+urlencoding = "2.1"
+
+# Logging (optional)
+tracing = { version = "0.1", optional = true }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+tokio = { version = "1.49", features = ["full", "test-util"] }
+wiremock = "0.6"
+pretty_assertions = "1.4"
+tokio-test = "0.4"
+
+[package.metadata.docs.rs]
+features = ["async", "reqwest-client", "rustls-tls", "tracing"]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+module_name_repetitions = "allow"
+must_use_candidate = "allow"

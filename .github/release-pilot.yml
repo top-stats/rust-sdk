@@ -1,0 +1,16 @@
+packages:
+  - name: topstats
+    ecosystem: cargo
+
+changelog:
+  enabled: true
+
+versionFiles:
+  enabled: true
+  files:
+    - file: README.md
+      pattern: 'topstats = "[0-9.]+"'
+      replace: 'topstats = "{version}"'
+    - file: README.md
+      pattern: 'topstats = \{ version = "[0-9.]+"'
+      replace: 'topstats = { version = "{version}"'
