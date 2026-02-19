@@ -8,7 +8,7 @@ pub mod as_string {
     use serde::{Deserialize, Deserializer, Serializer};
 
     /// Serializes a `u64` as a string.
-    #[allow(clippy::trivially_copy_pass_by_ref)]
+    #[allow(dead_code, clippy::trivially_copy_pass_by_ref)]
     pub fn serialize<S: Serializer>(value: &u64, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&value.to_string())
     }
@@ -25,7 +25,7 @@ pub mod option_as_string {
     use serde::{Deserialize, Deserializer, Serializer};
 
     /// Serializes an `Option<u64>` as an optional string.
-    #[allow(clippy::ref_option)]
+    #[allow(dead_code, clippy::ref_option)]
     pub fn serialize<S: Serializer>(value: &Option<u64>, serializer: S) -> Result<S::Ok, S::Error> {
         match value {
             Some(v) => serializer.serialize_some(&v.to_string()),
@@ -48,6 +48,7 @@ pub mod vec_as_string {
     use serde::{Deserialize, Deserializer, Serializer};
 
     /// Serializes a `Vec<u64>` as an array of strings.
+    #[allow(dead_code)]
     pub fn serialize<S: Serializer>(value: &[u64], serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeSeq;
         let mut seq = serializer.serialize_seq(Some(value.len()))?;
@@ -72,6 +73,7 @@ pub mod map_as_string_keys {
     use std::collections::HashMap;
 
     /// Serializes a `HashMap<u64, V>` with string keys.
+    #[allow(dead_code)]
     pub fn serialize<S, V>(value: &HashMap<u64, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

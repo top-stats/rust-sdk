@@ -1,55 +1,41 @@
 //! Historical data models.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::fmt;
 
 use super::snowflake;
 
 /// Time frame for historical data queries.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[serde(rename_all = "lowercase")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub enum TimeFrame {
     /// All available historical data.
     #[default]
-    #[serde(rename = "alltime")]
     AllTime,
     /// Last 5 years.
-    #[serde(rename = "5y")]
     FiveYears,
     /// Last 3 years.
-    #[serde(rename = "3y")]
     ThreeYears,
     /// Last 1 year.
-    #[serde(rename = "1y")]
     OneYear,
     /// Last 270 days (9 months).
-    #[serde(rename = "270d")]
     NineMonths,
     /// Last 180 days (6 months).
-    #[serde(rename = "180d")]
     SixMonths,
     /// Last 90 days (3 months).
-    #[serde(rename = "90d")]
     NinetyDays,
     /// Last 30 days.
-    #[serde(rename = "30d")]
     ThirtyDays,
     /// Last 7 days.
-    #[serde(rename = "7d")]
     SevenDays,
     /// Last 3 days.
-    #[serde(rename = "3d")]
     ThreeDays,
     /// Last 1 day.
-    #[serde(rename = "1d")]
     OneDay,
     /// Last 12 hours.
-    #[serde(rename = "12h")]
     TwelveHours,
     /// Last 6 hours.
-    #[serde(rename = "6h")]
     SixHours,
 }
 
@@ -82,8 +68,7 @@ impl fmt::Display for TimeFrame {
 }
 
 /// Type of historical data to query.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-#[serde(rename_all = "snake_case")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
 pub enum DataType {
     /// Monthly vote count.
@@ -117,13 +102,13 @@ impl fmt::Display for DataType {
 }
 
 /// A single historical data point.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct HistoricalDataPoint {
     /// Timestamp of this data point.
     pub time: DateTime<Utc>,
 
     /// Bot ID this data belongs to.
-    #[serde(with = "snowflake::as_string")]
+    #[serde(deserialize_with = "snowflake::as_string::deserialize")]
     pub id: u64,
 
     /// Monthly votes at this time (if requested).
@@ -153,7 +138,7 @@ impl HistoricalDataPoint {
 }
 
 /// Response from the historical data endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct HistoricalDataResponse {
     /// Array of historical data points.
     pub data: Vec<HistoricalDataPoint>,
@@ -161,10 +146,10 @@ pub struct HistoricalDataResponse {
 
 /// Response from the compare historical endpoint.
 /// Maps bot IDs to their historical data points.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct CompareHistoricalResponse {
     /// Map of bot ID to historical data points.
-    #[serde(with = "snowflake::map_as_string_keys")]
+    #[serde(deserialize_with = "snowflake::map_as_string_keys::deserialize")]
     pub data: std::collections::HashMap<u64, Vec<HistoricalDataPoint>>,
 }
 
