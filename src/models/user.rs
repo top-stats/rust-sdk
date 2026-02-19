@@ -1,19 +1,19 @@
 //! User-related models.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::snowflake;
 
 /// A bot owned by a user.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct UserBot {
     /// The bot's Discord ID.
-    #[serde(with = "snowflake::as_string")]
+    #[serde(deserialize_with = "snowflake::as_string::deserialize")]
     pub id: u64,
 
     /// Array of owner Discord IDs.
-    #[serde(with = "snowflake::vec_as_string")]
+    #[serde(deserialize_with = "snowflake::vec_as_string::deserialize")]
     pub owners: Vec<u64>,
 
     /// Whether the bot has been deleted from Top.gg.
@@ -68,7 +68,7 @@ pub struct UserBot {
 }
 
 /// Response from the user bots endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct UserBotsResponse {
     /// List of bots owned by the user.
     pub bots: Vec<UserBot>,

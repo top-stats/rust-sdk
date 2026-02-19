@@ -1,23 +1,26 @@
 //! Bot-related models.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::snowflake;
 
 /// Full bot data from the `TopStats` API.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct Bot {
     /// The bot's Discord ID.
-    #[serde(with = "snowflake::as_string")]
+    #[serde(deserialize_with = "snowflake::as_string::deserialize")]
     pub id: u64,
 
     /// The bot's Top.gg ID (may differ from Discord ID).
-    #[serde(with = "snowflake::option_as_string", rename = "topGGId")]
+    #[serde(
+        deserialize_with = "snowflake::option_as_string::deserialize",
+        rename = "topGGId"
+    )]
     pub topgg_id: Option<u64>,
 
     /// Array of owner Discord IDs.
-    #[serde(with = "snowflake::vec_as_string")]
+    #[serde(deserialize_with = "snowflake::vec_as_string::deserialize")]
     pub owners: Vec<u64>,
 
     /// Whether the bot has been deleted from Top.gg.
@@ -87,7 +90,7 @@ pub struct Bot {
 }
 
 /// Percentage changes in bot statistics.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct PercentageChanges {
     /// Daily percentage change.
     pub daily: Option<f64>,
@@ -96,10 +99,10 @@ pub struct PercentageChanges {
 }
 
 /// A partial bot with basic information (used in rankings and comparisons).
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct PartialBot {
     /// The bot's Discord ID.
-    #[serde(with = "snowflake::as_string")]
+    #[serde(deserialize_with = "snowflake::as_string::deserialize")]
     pub id: u64,
 
     /// The bot's display name.

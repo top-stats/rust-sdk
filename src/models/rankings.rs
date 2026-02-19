@@ -1,6 +1,6 @@
 //! Rankings data models.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::fmt;
 
 use super::snowflake;
@@ -65,10 +65,10 @@ impl fmt::Display for SortOrder {
 }
 
 /// A bot entry in the rankings.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct RankedBot {
     /// The bot's Discord ID.
-    #[serde(with = "snowflake::as_string")]
+    #[serde(deserialize_with = "snowflake::as_string::deserialize")]
     pub id: u64,
 
     /// The bot's display name.
@@ -106,7 +106,7 @@ pub struct RankedBot {
 }
 
 /// Response from the rankings endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
 pub struct RankingsResponse {
     /// Total number of bots tracked.
     #[serde(rename = "totalBotCount")]

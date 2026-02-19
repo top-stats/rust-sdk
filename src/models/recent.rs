@@ -1,10 +1,10 @@
 //! Recent data models.
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 /// A single data point in recent bot statistics.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct RecentDataPoint {
     /// Timestamp of this data point.
     pub time: DateTime<Utc>,
@@ -40,7 +40,7 @@ pub struct RecentDataPoint {
 /// Response from the recent data endpoint.
 ///
 /// Contains hourly data for the past 30 hours and daily data for the past month.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Deserialize, PartialEq)]
 pub struct RecentDataResponse {
     /// Hourly statistics for the past 30 hours.
     #[serde(rename = "hourlyData")]
