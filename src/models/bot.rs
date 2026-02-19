@@ -3,18 +3,22 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use super::snowflake;
+
 /// Full bot data from the `TopStats` API.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Bot {
     /// The bot's Discord ID.
-    pub id: String,
+    #[serde(with = "snowflake::as_string")]
+    pub id: u64,
 
     /// The bot's Top.gg ID (may differ from Discord ID).
-    #[serde(rename = "topGGId")]
-    pub topgg_id: Option<String>,
+    #[serde(with = "snowflake::option_as_string", rename = "topGGId")]
+    pub topgg_id: Option<u64>,
 
     /// Array of owner Discord IDs.
-    pub owners: Vec<String>,
+    #[serde(with = "snowflake::vec_as_string")]
+    pub owners: Vec<u64>,
 
     /// Whether the bot has been deleted from Top.gg.
     pub deleted: bool,
@@ -95,7 +99,8 @@ pub struct PercentageChanges {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct PartialBot {
     /// The bot's Discord ID.
-    pub id: String,
+    #[serde(with = "snowflake::as_string")]
+    pub id: u64,
 
     /// The bot's display name.
     pub name: String,
@@ -123,28 +128,29 @@ pub struct PartialBot {
 }
 
 impl Bot {
-    /// Validates that the given string is a valid Discord bot ID (snowflake).
+    /// Validates that the given value is a valid Discord snowflake ID.
     ///
     /// Discord snowflakes are 17-19 digit integers.
     #[must_use]
-    pub fn validate_id(id: &str) -> bool {
-        id.len() >= 17 && id.len() <= 19 && id.chars().all(|c| c.is_ascii_digit())
+    pub const fn validate_id(id: u64) -> bool {
+        // 17 digits minimum: 10^16 = 10_000_000_000_000_000
+        id >= 10_000_000_000_000_000
     }
 
     /// Returns the creation timestamp of this bot based on its Discord snowflake ID.
     ///
     /// Discord snowflakes encode the creation timestamp in the first 42 bits.
     #[must_use]
-    pub fn created_at(&self) -> Option<DateTime<Utc>> {
-        snowflake_to_datetime(&self.id)
+    pub const fn created_at(&self) -> Option<DateTime<Utc>> {
+        snowflake_to_datetime(self.id)
     }
 }
 
 impl PartialBot {
     /// Returns the creation timestamp of this bot based on its Discord snowflake ID.
     #[must_use]
-    pub fn created_at(&self) -> Option<DateTime<Utc>> {
-        snowflake_to_datetime(&self.id)
+    pub const fn created_at(&self) -> Option<DateTime<Utc>> {
+        snowflake_to_datetime(self.id)
     }
 }
 
@@ -152,10 +158,9 @@ impl PartialBot {
 const DISCORD_EPOCH: i64 = 1_420_070_400_000;
 
 /// Converts a Discord snowflake ID to a `DateTime`.
-fn snowflake_to_datetime(id: &str) -> Option<DateTime<Utc>> {
-    let snowflake: u64 = id.parse().ok()?;
+const fn snowflake_to_datetime(id: u64) -> Option<DateTime<Utc>> {
     #[allow(clippy::cast_possible_wrap)]
-    let timestamp_ms = ((snowflake >> 22) as i64) + DISCORD_EPOCH;
+    let timestamp_ms = ((id >> 22) as i64) + DISCORD_EPOCH;
     DateTime::from_timestamp_millis(timestamp_ms)
 }
 
@@ -166,21 +171,20 @@ mod tests {
     #[test]
     fn test_validate_bot_id() {
         // Valid IDs
-        assert!(Bot::validate_id("432610292342587392")); // 18 digits
-        assert!(Bot::validate_id("12345678901234567")); // 17 digits
-        assert!(Bot::validate_id("1234567890123456789")); // 19 digits
+        assert!(Bot::validate_id(432_610_292_342_587_392)); // 18 digits
+        assert!(Bot::validate_id(10_000_000_000_000_000)); // 17 digits (minimum)
+        assert!(Bot::validate_id(1_234_567_890_123_456_789)); // 19 digits
 
         // Invalid IDs
-        assert!(!Bot::validate_id("123")); // Too short
-        assert!(!Bot::validate_id("abc123")); // Contains letters
-        assert!(!Bot::validate_id("")); // Empty
-        assert!(!Bot::validate_id("12345678901234567890")); // Too long (20 digits)
+        assert!(!Bot::validate_id(123)); // Too small
+        assert!(!Bot::validate_id(0)); // Zero
+        assert!(!Bot::validate_id(9_999_999_999_999_999)); // 16 digits
     }
 
     #[test]
     fn test_snowflake_to_datetime() {
         // Known snowflake: 432610292342587392 created around 2018-04-08
-        let dt = snowflake_to_datetime("432610292342587392").unwrap();
+        let dt = snowflake_to_datetime(432_610_292_342_587_392).unwrap();
         assert_eq!(dt.year(), 2018);
         assert_eq!(dt.month(), 4);
     }
@@ -210,10 +214,11 @@ mod tests {
         }"#;
 
         let bot: Bot = serde_json::from_str(json).unwrap();
-        assert_eq!(bot.id, "583807014896140293");
+        assert_eq!(bot.id, 583_807_014_896_140_293);
         assert_eq!(bot.name, "TopStats");
         assert_eq!(bot.monthly_votes, 4);
         assert_eq!(bot.owners.len(), 1);
+        assert_eq!(bot.owners[0], 321_714_991_050_784_770);
         assert!(!bot.deleted);
         assert_eq!(bot.tags.len(), 2);
     }
@@ -232,7 +237,7 @@ mod tests {
         }"#;
 
         let bot: PartialBot = serde_json::from_str(json).unwrap();
-        assert_eq!(bot.id, "432610292342587392");
+        assert_eq!(bot.id, 432_610_292_342_587_392);
         assert_eq!(bot.name, "Mudae");
         assert_eq!(bot.monthly_votes_rank, 1);
     }

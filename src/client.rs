@@ -12,7 +12,7 @@
 //! #[tokio::main]
 //! async fn main() -> Result<(), topstats::Error> {
 //!     let client = Client::new("your-api-token")?;
-//!     let bot = client.get_bot("432610292342587392").await?;
+//!     let bot = client.get_bot(432610292342587392).await?;
 //!     println!("Bot: {}", bot.name);
 //!     Ok(())
 //! }
@@ -32,7 +32,7 @@
 //!
 //! fn main() -> Result<(), topstats::Error> {
 //!     let client = Client::new("your-api-token")?;
-//!     let bot = client.get_bot("432610292342587392")?;
+//!     let bot = client.get_bot(432610292342587392)?;
 //!     println!("Bot: {}", bot.name);
 //!     Ok(())
 //! }
@@ -352,7 +352,7 @@ where
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
     #[maybe_async::maybe_async]
-    pub async fn get_bot(&self, bot_id: &str) -> Result<Bot> {
+    pub async fn get_bot(&self, bot_id: u64) -> Result<Bot> {
         endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}");
         let response = self.request(&endpoint, &[]).await?;
@@ -373,7 +373,7 @@ where
     #[maybe_async::maybe_async]
     pub async fn get_bot_historical(
         &self,
-        bot_id: &str,
+        bot_id: u64,
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<HistoricalDataResponse> {
@@ -403,7 +403,7 @@ where
     ///
     /// Returns an error if the bot ID is invalid or the request fails.
     #[maybe_async::maybe_async]
-    pub async fn get_bot_recent(&self, bot_id: &str) -> Result<RecentDataResponse> {
+    pub async fn get_bot_recent(&self, bot_id: u64) -> Result<RecentDataResponse> {
         endpoints::validate_bot_id(bot_id)?;
         let endpoint = format!("/discord/bots/{bot_id}/recent");
         let response = self.request(&endpoint, &[]).await?;
@@ -498,17 +498,21 @@ where
     ///
     /// Returns an error if any bot ID is invalid or the request fails.
     #[maybe_async::maybe_async]
-    pub async fn compare_bots(&self, bot_ids: &[&str]) -> Result<Vec<RankedBot>> {
+    pub async fn compare_bots(&self, bot_ids: &[u64]) -> Result<Vec<RankedBot>> {
         if bot_ids.is_empty() {
             return Err(Error::InvalidInput(
                 "compare_bots requires at least one bot ID".to_string(),
             ));
         }
-        for id in bot_ids {
+        for &id in bot_ids {
             endpoints::validate_bot_id(id)?;
         }
 
-        let path = bot_ids.join("/");
+        let path = bot_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("/");
         let endpoint = format!("/discord/compare/{path}");
         let response = self.request(&endpoint, &[]).await?;
         let compare_response: endpoints::CompareResponse = response.json()?;
@@ -529,7 +533,7 @@ where
     #[maybe_async::maybe_async]
     pub async fn compare_bots_historical(
         &self,
-        bot_ids: &[&str],
+        bot_ids: &[u64],
         time_frame: TimeFrame,
         data_type: DataType,
     ) -> Result<CompareHistoricalResponse> {
@@ -538,11 +542,15 @@ where
                 "compare_bots_historical requires at least one bot ID".to_string(),
             ));
         }
-        for id in bot_ids {
+        for &id in bot_ids {
             endpoints::validate_bot_id(id)?;
         }
 
-        let path = bot_ids.join("/");
+        let path = bot_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>()
+            .join("/");
         let endpoint = format!("/discord/compare/historical/{path}");
         let response = self
             .request(
@@ -573,7 +581,7 @@ where
     /// Data may be inaccurate as bots transferred to teams still appear
     /// on the original owner's account.
     #[maybe_async::maybe_async]
-    pub async fn get_user_bots(&self, user_id: &str) -> Result<UserBotsResponse> {
+    pub async fn get_user_bots(&self, user_id: u64) -> Result<UserBotsResponse> {
         endpoints::validate_user_id(user_id)?;
         let endpoint = format!("/discord/users/{user_id}/bots");
         let response = self.request(&endpoint, &[]).await?;
@@ -601,9 +609,9 @@ mod tests {
 
     #[test]
     fn test_validate_bot_id() {
-        assert!(endpoints::validate_bot_id("432610292342587392").is_ok());
-        assert!(endpoints::validate_bot_id("123").is_err());
-        assert!(endpoints::validate_bot_id("abc").is_err());
+        assert!(endpoints::validate_bot_id(432_610_292_342_587_392).is_ok());
+        assert!(endpoints::validate_bot_id(123).is_err());
+        assert!(endpoints::validate_bot_id(0).is_err());
     }
 
     #[test]
@@ -763,7 +771,7 @@ mod tests {
         };
 
         let client = mock_client(response);
-        let result = client.get_user_bots("invalid").await;
+        let result = client.get_user_bots(123).await;
 
         assert!(result.is_err());
         let err_msg = result.unwrap_err().to_string();

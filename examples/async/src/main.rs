@@ -13,7 +13,7 @@ async fn main() -> Result<(), topstats::Error> {
 
     // Get bot information
     println!("=== Getting Bot Info ===");
-    let bot = client.get_bot("432610292342587392").await?;
+    let bot = client.get_bot(432610292342587392).await?;
     println!("Bot: {} (ID: {})", bot.name, bot.id);
     println!("  Monthly votes: {}", bot.monthly_votes);
     println!("  Total votes: {}", bot.total_votes);
@@ -24,7 +24,7 @@ async fn main() -> Result<(), topstats::Error> {
     println!("\n=== Historical Data (Last 30 Days) ===");
     let history = client
         .get_bot_historical(
-            "432610292342587392",
+            432610292342587392,
             TimeFrame::ThirtyDays,
             DataType::MonthlyVotes,
         )
@@ -54,7 +54,7 @@ async fn main() -> Result<(), topstats::Error> {
     // Compare bots
     println!("\n=== Comparing Two Bots ===");
     let comparison = client
-        .compare_bots(&["432610292342587392", "646937666251915264"])
+        .compare_bots(&[432610292342587392, 646937666251915264])
         .await?;
     for bot in &comparison {
         println!(

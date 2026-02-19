@@ -3,6 +3,8 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use super::snowflake;
+
 /// Sort criteria for rankings queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 #[non_exhaustive]
@@ -66,7 +68,8 @@ impl fmt::Display for SortOrder {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct RankedBot {
     /// The bot's Discord ID.
-    pub id: String,
+    #[serde(with = "snowflake::as_string")]
+    pub id: u64,
 
     /// The bot's display name.
     pub name: String,
@@ -205,7 +208,7 @@ mod tests {
         }"#;
 
         let bot: RankedBot = serde_json::from_str(json).unwrap();
-        assert_eq!(bot.id, "432610292342587392");
+        assert_eq!(bot.id, 432_610_292_342_587_392);
         assert_eq!(bot.name, "Mudae");
         assert_eq!(bot.monthly_votes_rank, 1);
         assert_eq!(bot.server_count, Some(3_371_839));
