@@ -7,7 +7,7 @@ use crate::error::{Error, Result};
 use crate::models::{Bot, RankedBot};
 
 /// Validates a Discord bot ID format (17-19 digit snowflake).
-pub fn validate_bot_id(id: &str) -> Result<()> {
+pub fn validate_bot_id(id: u64) -> Result<()> {
     if Bot::validate_id(id) {
         Ok(())
     } else {
@@ -16,7 +16,7 @@ pub fn validate_bot_id(id: &str) -> Result<()> {
 }
 
 /// Validates a Discord user ID format (17-19 digit snowflake).
-pub fn validate_user_id(id: &str) -> Result<()> {
+pub fn validate_user_id(id: u64) -> Result<()> {
     if Bot::validate_id(id) {
         Ok(())
     } else {

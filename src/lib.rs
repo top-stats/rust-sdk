@@ -21,7 +21,7 @@
 //!     let client = Client::new("your-api-token")?;
 //!
 //!     // Get bot information
-//!     let bot = client.get_bot("432610292342587392").await?;
+//!     let bot = client.get_bot(432610292342587392).await?;
 //!     println!("Bot: {} has {} monthly votes", bot.name, bot.monthly_votes);
 //!
 //!     Ok(())
@@ -42,7 +42,7 @@
 //!
 //! fn main() -> Result<(), topstats::Error> {
 //!     let client = Client::new("your-api-token")?;
-//!     let bot = client.get_bot("432610292342587392")?;
+//!     let bot = client.get_bot(432610292342587392)?;
 //!     println!("Bot: {}", bot.name);
 //!     Ok(())
 //! }

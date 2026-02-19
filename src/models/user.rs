@@ -3,14 +3,18 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use super::snowflake;
+
 /// A bot owned by a user.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct UserBot {
     /// The bot's Discord ID.
-    pub id: String,
+    #[serde(with = "snowflake::as_string")]
+    pub id: u64,
 
     /// Array of owner Discord IDs.
-    pub owners: Vec<String>,
+    #[serde(with = "snowflake::vec_as_string")]
+    pub owners: Vec<u64>,
 
     /// Whether the bot has been deleted from Top.gg.
     pub deleted: bool,
@@ -129,9 +133,10 @@ mod tests {
         }"#;
 
         let bot: UserBot = serde_json::from_str(json).unwrap();
-        assert_eq!(bot.id, "461521980492087297");
+        assert_eq!(bot.id, 461_521_980_492_087_297);
         assert_eq!(bot.name, "Shiro");
         assert_eq!(bot.owners.len(), 1);
+        assert_eq!(bot.owners[0], 205_680_187_394_752_512);
         assert!(!bot.deleted);
         assert_eq!(bot.server_count, Some(17762));
     }
