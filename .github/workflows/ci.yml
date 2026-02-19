@@ -112,7 +112,7 @@ jobs:
       - name: Typos
         uses: crate-ci/typos@master
       - name: Markdown
-        uses: DavidAnson/markdownlint-cli2-action@v19
+        uses: DavidAnson/markdownlint-cli2-action@v22
         with:
           globs: "**/*.md"
 
