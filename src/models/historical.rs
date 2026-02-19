@@ -4,6 +4,8 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
+use super::snowflake;
+
 /// Time frame for historical data queries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
@@ -121,7 +123,8 @@ pub struct HistoricalDataPoint {
     pub time: DateTime<Utc>,
 
     /// Bot ID this data belongs to.
-    pub id: String,
+    #[serde(with = "snowflake::as_string")]
+    pub id: u64,
 
     /// Monthly votes at this time (if requested).
     pub monthly_votes: Option<i64>,
@@ -161,7 +164,8 @@ pub struct HistoricalDataResponse {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct CompareHistoricalResponse {
     /// Map of bot ID to historical data points.
-    pub data: std::collections::HashMap<String, Vec<HistoricalDataPoint>>,
+    #[serde(with = "snowflake::map_as_string_keys")]
+    pub data: std::collections::HashMap<u64, Vec<HistoricalDataPoint>>,
 }
 
 #[cfg(test)]
@@ -192,7 +196,7 @@ mod tests {
         }"#;
 
         let point: HistoricalDataPoint = serde_json::from_str(json).unwrap();
-        assert_eq!(point.id, "583807014896140293");
+        assert_eq!(point.id, 583_807_014_896_140_293);
         assert_eq!(point.monthly_votes, Some(265));
         assert_eq!(point.total_votes, Some(1000));
         assert_eq!(point.server_count, Some(500));
@@ -203,7 +207,7 @@ mod tests {
     fn test_historical_data_point_value_for() {
         let point = HistoricalDataPoint {
             time: Utc::now(),
-            id: "123".to_string(),
+            id: 432_610_292_342_587_392,
             monthly_votes: Some(100),
             total_votes: Some(500),
             server_count: None,
