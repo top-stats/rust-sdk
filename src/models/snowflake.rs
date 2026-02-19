@@ -5,10 +5,14 @@
 
 /// Serialize/deserialize a `u64` as a JSON string.
 pub mod as_string {
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer};
+
+    #[cfg(test)]
+    use serde::Serializer;
 
     /// Serializes a `u64` as a string.
-    #[allow(dead_code, clippy::trivially_copy_pass_by_ref)]
+    #[cfg(test)]
+    #[allow(clippy::trivially_copy_pass_by_ref)]
     pub fn serialize<S: Serializer>(value: &u64, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(&value.to_string())
     }
@@ -22,10 +26,14 @@ pub mod as_string {
 
 /// Serialize/deserialize an `Option<u64>` as an optional JSON string.
 pub mod option_as_string {
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer};
+
+    #[cfg(test)]
+    use serde::Serializer;
 
     /// Serializes an `Option<u64>` as an optional string.
-    #[allow(dead_code, clippy::ref_option)]
+    #[cfg(test)]
+    #[allow(clippy::ref_option)]
     pub fn serialize<S: Serializer>(value: &Option<u64>, serializer: S) -> Result<S::Ok, S::Error> {
         match value {
             Some(v) => serializer.serialize_some(&v.to_string()),
@@ -45,10 +53,13 @@ pub mod option_as_string {
 
 /// Serialize/deserialize a `Vec<u64>` as a JSON array of strings.
 pub mod vec_as_string {
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer};
+
+    #[cfg(test)]
+    use serde::Serializer;
 
     /// Serializes a `Vec<u64>` as an array of strings.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn serialize<S: Serializer>(value: &[u64], serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeSeq;
         let mut seq = serializer.serialize_seq(Some(value.len()))?;
@@ -69,11 +80,14 @@ pub mod vec_as_string {
 
 /// Serialize/deserialize a `HashMap<u64, V>` with JSON string keys.
 pub mod map_as_string_keys {
-    use serde::{Deserialize, Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer};
     use std::collections::HashMap;
 
+    #[cfg(test)]
+    use serde::Serializer;
+
     /// Serializes a `HashMap<u64, V>` with string keys.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn serialize<S, V>(value: &HashMap<u64, V>, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
