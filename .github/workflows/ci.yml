@@ -49,16 +49,14 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
 
-  # TODO: Re-enable semver checks after v0.1.0 is published to crates.io
-  # Currently disabled because the baseline (v0.0.0) is a placeholder crate with no lib target
-  # - uses: obi1kenobi/cargo-semver-checks-action@v2
-  #   with:
-  #     feature-group: only-explicit-features
-  #     features: async,reqwest-client,rustls-tls
-  # - uses: obi1kenobi/cargo-semver-checks-action@v2
-  #   with:
-  #     feature-group: only-explicit-features
-  #     features: blocking,ureq-client
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          feature-group: only-explicit-features
+          features: async,reqwest-client,rustls-tls
+      - uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          feature-group: only-explicit-features
+          features: blocking,ureq-client
 
   nightly:
     name: Nightly
