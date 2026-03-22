@@ -51,7 +51,7 @@ reqwest = { version = "0.13", default-features = false, features = [
   "json",
   "query",
 ], optional = true }
-ureq = { version = "3.2", features = ["json"], optional = true }
+ureq = { version = "3.3", features = ["json"], optional = true }
 urlencoding = "2.1"
 
 # Logging (optional)
